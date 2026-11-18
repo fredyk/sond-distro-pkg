@@ -1,0 +1,15 @@
+# Build products never enter the repository: the artifacts live under
+# /tank/tmp/gr4v5ond7/forks/ and are referenced by sha256 in the delivery.
+*.o
+*.a
+*.so
+*.ko
+build/
+dist/
+__pycache__/
+*.pyc
+.venv/
+*.raw
+*.img
+*.qcow2
+*.log
