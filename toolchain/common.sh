@@ -59,6 +59,20 @@ NCURSES_TAG=v6_6
 NCURSES_VERSION=6.6
 NCURSES_COMMIT=0096bd402c4a9c8f39bd7ed266e1b8920327e4d8
 
+# linux-headers: the kernel's sanitized UAPI headers (make headers_install) as
+# sabotage-linux keeps them, with its musl fixes to libc-compat.h; the tag is
+# lightweight and resolves straight to the commit.
+LINUX_HEADERS_URL=https://github.com/fredyk/linux-headers-sond
+LINUX_HEADERS_UPSTREAM=https://github.com/sabotage-linux/kernel-headers
+LINUX_HEADERS_TAG=v6.12.77
+LINUX_HEADERS_COMMIT=eda76135ba1d81d84780af71dcb1b302eb641d39
+
+# htop 3.5.3 is a lightweight tag: the tag resolves straight to the commit.
+HTOP_URL=https://github.com/fredyk/htop-sond
+HTOP_UPSTREAM=https://github.com/htop-dev/htop
+HTOP_TAG=3.5.3
+HTOP_COMMIT=20882b8ef8271fb49ea0eb74bbfd484e9b0a11d8
+
 # ---------------------------------------------------------------------------
 # Reproducibility (RFC-0018): two clean builds, same bytes.
 # ---------------------------------------------------------------------------

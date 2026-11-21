@@ -1,0 +1,51 @@
+# Modified by the Sond project, 2026-11-21
+# Builds the htop package (a static binary linked with the published ncurses)
+# from this fork's sond branch against the pinned musl and publishes it to
+# dist.sond.dev, its corresponding source first. Generated from
+# fredyk/sond-distro-pkg ci/forks.
+name: sond package
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: htop
+          version: 3.5.3
+          license: GPL-2.0-or-later AND GPL-2.0-only
+          upstream: github.com/htop-dev/htop@20882b8ef8271fb49ea0eb74bbfd484e9b0a11d8
+          license-files: |
+            COPYING
+          depends: |
+            ncurses 6.6
+            linux-headers 6.12.77
+          build: |
+            # The options the licence opinion fixes (section 2.9): no libsensors,
+            # libcap, libnl, hwloc, demangler or libunwind is linked in, so what is
+            # bundled is exactly ncurses and musl.
+            ./autogen.sh
+            ./configure --prefix=/ --enable-static --enable-unicode \
+              --disable-sensors --disable-capabilities --disable-delayacct \
+              --disable-hwloc --disable-demangling --without-libunwind \
+              CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static"
+            make -j"$(nproc)"
+            make install DESTDIR="$SOND_PAYLOAD"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}

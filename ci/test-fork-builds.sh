@@ -15,7 +15,7 @@ action=${SOND_BUILD_ACTION:?set SOND_BUILD_ACTION to a sond-build-action checkou
 work=${SOND_CI_WORK:-$(mktemp -d)}
 mkdir -p "$work"
 forks=("$@")
-[ ${#forks[@]} -gt 0 ] || forks=(toybox mksh musl ncurses)
+[ ${#forks[@]} -gt 0 ] || forks=(toybox mksh musl ncurses linux-headers htop)
 
 fails=0
 ok() { printf 'ok   %s\n' "$1"; }
@@ -50,15 +50,25 @@ build_fork() { # <fork> <url> <tag> <commit>
 	local dir=$work/$fork/src
 	local -A in=()
 	[ -d "$dir/.git" ] || git clone -q --branch "$tag" "$url" "$dir"
-	git -C "$dir" checkout -q "$commit"
+	# What CI builds: the fork's sond branch when it exists, else the pinned upstream commit.
+	if git -C "$dir" fetch -q origin sond 2>/dev/null; then
+		git -C "$dir" checkout -q FETCH_HEAD
+		git -C "$dir" merge-base --is-ancestor "$commit" HEAD || { bad "$fork: sond branch descends from $commit"; return; }
+	else
+		git -C "$dir" checkout -q "$commit"
+	fi
 	while IFS= read -r -d '' kv; do in[${kv%%=*}]=${kv#*=}; done < <(inputs_of "$here/forks/$fork-sond.yml")
 
 	local args=(--fork "$dir" --repository "fredyk/$fork-sond" --name "${in[name]}"
 		--version "${in[version]}" --license "${in[license]}" --upstream "${in[upstream]}"
 		--build "${in[build]}" --out "$work/$fork/out")
+	[ -z "${in[linkage]:-}" ] || args+=(--linkage "${in[linkage]}")
 	while IFS= read -r f; do
 		[ -n "$f" ] && args+=(--license-file "$f")
 	done <<<"${in[license-files]:-}"
+	while IFS= read -r d; do
+		[ -n "$d" ] && args+=(--depends "$d")
+	done <<<"${in[depends]:-}"
 
 	local log=$work/$fork/build.log res
 	if ! res=$(RUNNER_TEMP=$work/$fork/runner SOND_WORK=$work/$fork/runner/sond SOND_DISTRO_PKG=$distro \
@@ -70,6 +80,7 @@ build_fork() { # <fork> <url> <tag> <commit>
 	ok "$fork: build.sh succeeds"
 	local bundle
 	bundle=$(sed -n 's/^bundle=//p' <<<"$res")
+	sed -n 's/^source_bundle=//p' <<<"$res" >"$work/$fork/source_bundle"
 	python3 "$distro/sondpkg/bin/sondpkg" verify-bundle "$bundle" >/dev/null &&
 		ok "$fork: bundle verifies" || bad "$fork: bundle verifies"
 	printf '%s\n' "$bundle" >"$work/$fork/bundle"
@@ -133,6 +144,38 @@ for fork in "${forks[@]}"; do
 			strings "$(cat "$work/ncurses/bundle")/payload/lib/libtinfow.a" | grep -x "$t|.*" >/dev/null &&
 				ok "ncurses: $t is a fallback" || bad "ncurses: $t is a fallback"
 		done
+		;;
+	linux-headers)
+		build_fork linux-headers "$LINUX_HEADERS_URL" "$LINUX_HEADERS_TAG" "$LINUX_HEADERS_COMMIT"
+		[ -f "$work/linux-headers/bundle" ] || continue
+		for f in linux/capability.h linux/version.h asm/unistd.h asm-generic/errno.h linux/libc-compat.h; do
+			has_file linux-headers "include/$f"
+		done
+		b=$(cat "$work/linux-headers/bundle")
+		n=$(find "$b/payload" -type f ! -name '*.h' ! -path '*/share/licenses/*' | wc -l)
+		[ "$n" = 0 ] && ok "linux-headers: ships only headers and licences" || bad "linux-headers: ships only headers and licences ($n other files)"
+		grep -q '^ *bundled *=' "$b/MANIFEST" && bad "linux-headers: nothing is linked into headers" || ok "linux-headers: nothing is linked into headers"
+		src=$(cat "$work/linux-headers/source_bundle")
+		[ -n "$src" ] && python3 "$distro/sondpkg/bin/sondpkg" verify-bundle "$src" >/dev/null &&
+			ok "linux-headers: the corresponding source bundle verifies" || bad "linux-headers: the corresponding source bundle verifies"
+		;;
+	htop)
+		build_fork htop "$HTOP_URL" "$HTOP_TAG" "$HTOP_COMMIT"
+		[ -f "$work/htop/bundle" ] || continue
+		static_bin htop bin/htop
+		b=$(cat "$work/htop/bundle")
+		for f in COPYING ncurses-COPYING musl-COPYRIGHT; do has_file htop "share/licenses/htop/$f"; done
+		# dictamen 3.1 rule 5: exactly ncurses and musl are linked in
+		[ "$(sed -n '/^ *bundled *=/,/\]/p' "$b/MANIFEST" | grep -oE '"[a-z0-9.+_-]+ ' | tr -d '" ' | sort | tr '\n' ' ')" = "musl ncurses " ] &&
+			ok "htop: bundled is exactly ncurses and musl" || bad "htop: bundled is exactly ncurses and musl ($(grep -A4 bundled "$b/MANIFEST"))"
+		src=$(cat "$work/htop/source_bundle")
+		[ -n "$src" ] && python3 "$distro/sondpkg/bin/sondpkg" verify-bundle "$src" >/dev/null &&
+			ok "htop: the corresponding source bundle verifies" || bad "htop: the corresponding source bundle verifies"
+		for f in "htop-$HTOP_TAG.tar.gz" musl-1.2.5.tar.gz "ncurses-$NCURSES_VERSION.tar.gz" build-recipe.sh; do
+			[ -f "$src/payload/share/src/htop/$f" ] && ok "htop-source: holds $f" || bad "htop-source: holds $f"
+		done
+		out=$(TERM=xterm-256color "$b/payload/bin/htop" --version 2>&1 || true)
+		case $out in "htop $HTOP_TAG"*) ok "htop: runs" ;; *) bad "htop: runs (got $out)" ;; esac
 		;;
 	*) bad "unknown fork $fork" ;;
 	esac

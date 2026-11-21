@@ -39,6 +39,13 @@ class SpdxTest(unittest.TestCase):
         with self.assertRaises(PackagerError):
             spdx.check_license("MPL-2.0")
 
+    def test_linux_headers_licence_is_admitted(self):
+        # the licence opinion, section 2.11 (1): the kernel UAPI headers' computed expression
+        spdx.check_license(
+            "GPL-2.0-only WITH Linux-syscall-note AND LGPL-2.1-only WITH Linux-syscall-note"
+            " AND MIT AND BSD-3-Clause"
+        )
+
     def test_bundled_licence_atoms_and_exceptions(self):
         spdx.check_bundled("LGPL-3.0-only WITH LGPL-3.0-linking-exception")
         spdx.check_bundled("BSD-3-Clause OR GPL-2.0-only")

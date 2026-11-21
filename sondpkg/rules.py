@@ -7,10 +7,26 @@ the package instead of trusting a README.
 import os
 import re
 
-from sondpkg import spdx
+from sondpkg import linuxheaders, spdx
 from sondpkg.errors import PackagerError
 
 ALLOWED_LICENSES = tuple(sorted(spdx.LICENSE_ATOMS))
+
+# Packages whose licence texts the opinion lists file by file, with the kernel's paths so the
+# COPYING's references resolve (dictamen 2.11 (2)).
+PACKAGE_TEXTS = {
+    "linux-headers": (
+        "COPYING",
+        "LICENSES/preferred/GPL-2.0",
+        "LICENSES/exceptions/Linux-syscall-note",
+        "LICENSES/preferred/LGPL-2.1",
+        "LICENSES/preferred/MIT",
+        "LICENSES/preferred/BSD-3-Clause",
+    ),
+}
+# Packages whose licence is computed from the payload, not written (dictamen 3.1, rule 9).
+COMPUTED_LICENSE = {"linux-headers": lambda payload: linuxheaders.computed_license(
+    os.path.join(payload, "include"))}
 
 # Licences whose notice must travel verbatim with every copy: the package ships
 # the upstream file that carries it, under share/licenses/<name>/.
@@ -112,6 +128,13 @@ def required_licence_files(name, linkage, license=None, bundled=None):
                 "a GPL licence must ship its upstream COPYING unchanged",
             )
         )
+    for text in PACKAGE_TEXTS.get(name, ()):
+        required.append(
+            (
+                "share/licenses/%s/%s" % (name, text),
+                "the licence opinion lists %s among %s's licence texts" % (text, name),
+            )
+        )
     texts = []
     for component, _, expression in parse_bundled(bundled):
         if component == "ncurses":
@@ -169,3 +192,9 @@ def check_payload(name, linkage, payload, license=None, bundled=None):
         path = os.path.join(payload, *relative.split("/"))
         if not os.path.isfile(path):
             raise PackagerError("missing licence file %s: %s" % (relative, reason))
+    if name in COMPUTED_LICENSE:
+        computed = COMPUTED_LICENSE[name](payload)
+        if license != computed:
+            raise PackagerError(
+                'license of %s is computed from its payload: "%s", not "%s"' % (name, computed, license)
+            )

@@ -74,6 +74,45 @@ class ChangeMarkTest(unittest.TestCase):
         rc, _, err = run_cli(["check-change-marks", self.repo, self.commit])
         self.assertEqual(rc, 0, err)
 
+    def _add_and_commit(self, relative, data):
+        write_bytes(os.path.join(self.repo, *relative.split("/")), data)
+        git(self.repo, "add", relative)
+        git(self.repo, "commit", "-q", "-m", "Modified by the Sond project, 2026-11-21")
+
+    def test_added_official_licence_text_needs_no_mark(self):
+        # the opinion's rule 6: an added licence text stays byte-identical (the GPL forbids
+        # changing it) and is checked by its sha256 against the official source instead
+        from sondpkg import changemarks
+        text = b"official licence text\n"
+        digest = __import__("hashlib").sha256(text).hexdigest()
+        self._add_and_commit("LICENSES/preferred/GPL-2.0", text)
+        saved = dict(changemarks.LICENCE_TEXTS)
+        changemarks.LICENCE_TEXTS[digest] = "test text"
+        try:
+            unmarked, _ = changemarks.check_change_marks(self.repo, self.commit)
+        finally:
+            changemarks.LICENCE_TEXTS.clear()
+            changemarks.LICENCE_TEXTS.update(saved)
+        self.assertEqual(unmarked, [])
+
+    def test_added_file_that_is_not_an_official_text_still_needs_the_mark(self):
+        self._add_and_commit("LICENSES/preferred/GPL-2.0", b"a licence text someone edited\n")
+        rc, _, err = run_cli(["check-change-marks", self.repo, self.commit])
+        self.assertNotEqual(rc, 0)
+        self.assertIn("LICENSES/preferred/GPL-2.0", err)
+
+    def test_the_kernel_licence_texts_are_known(self):
+        from sondpkg import changemarks
+        for digest in (
+            "fb5a425bd3b3cd6071a3a9aff9909a859e7c1158d54d32e07658398cd67eb6a0",
+            "f6b78c087c3ebdf0f3c13415070dd480a3f35d8fc76f3d02180a407c1c812f79",
+            "8e378ab93586eb55135d3bc119cce787f7324f48394777d00c34fa3d0be3303f",
+            "efbaee946ac92a48b89eae36f655844042370d2f0e04eadea1e2998efae24ebd",
+            "323c587d0ccf10e376f8bf9a7f31fb4ca6078105194b42e0b1e0ee2bc9bde71f",
+            "7a83b1aeb460458db9a4bd521d7f237c45b1650f6e60ea5ffc71e49472454de3",
+        ):
+            self.assertIn(digest, changemarks.LICENCE_TEXTS)
+
     def test_deleted_file_is_reported_but_not_a_failure(self):
         os.remove(os.path.join(self.repo, "gone.c"))
         rc, out, err = run_cli(["check-change-marks", self.repo, self.commit])

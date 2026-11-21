@@ -1,0 +1,45 @@
+# Modified by the Sond project, 2026-11-21
+# Builds the linux-headers package (the kernel's sanitized UAPI headers for
+# x86_64) from this fork's sond branch and publishes it, with its
+# corresponding source first, to dist.sond.dev. Generated from
+# fredyk/sond-distro-pkg ci/forks.
+name: sond package
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: linux-headers
+          version: 6.12.77
+          license: GPL-2.0-only WITH Linux-syscall-note AND LGPL-2.1-only WITH Linux-syscall-note AND MIT AND BSD-3-Clause
+          linkage: none (headers)
+          upstream: github.com/sabotage-linux/kernel-headers@eda76135ba1d81d84780af71dcb1b302eb641d39
+          license-files: |
+            COPYING=share/licenses/linux-headers/COPYING
+            LICENSES/preferred/GPL-2.0=share/licenses/linux-headers/LICENSES/preferred/GPL-2.0
+            LICENSES/exceptions/Linux-syscall-note=share/licenses/linux-headers/LICENSES/exceptions/Linux-syscall-note
+            LICENSES/preferred/LGPL-2.1=share/licenses/linux-headers/LICENSES/preferred/LGPL-2.1
+            LICENSES/preferred/MIT=share/licenses/linux-headers/LICENSES/preferred/MIT
+            LICENSES/preferred/BSD-3-Clause=share/licenses/linux-headers/LICENSES/preferred/BSD-3-Clause
+          build: |
+            make ARCH=x86_64 prefix=/ DESTDIR="$SOND_PAYLOAD" install
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}

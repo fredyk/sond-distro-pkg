@@ -14,13 +14,13 @@ fails=0
 ok() { printf 'ok   %s\n' "$1"; }
 bad() { printf 'FAIL %s\n' "$1"; fails=$((fails + 1)); }
 
-check() { # <fork> <package> <version> <upstream>
-	local name=$1 package=$2 version=$3 upstream=$4
+check() { # <fork> <package> <version> <upstream> [copyleft]
+	local name=$1 package=$2 version=$3 upstream=$4 copyleft=${5:-}
 	local wf=$here/forks/$name-sond.yml
 	[ -f "$wf" ] || { bad "$name: $wf exists"; return; }
-	python3 - "$wf" "$name" "$package" "$version" "$upstream" <<'PY' || fails=$((fails + 1))
+	python3 - "$wf" "$name" "$package" "$version" "$upstream" "$copyleft" <<'PY' || fails=$((fails + 1))
 import re, sys
-path, name, package, version, upstream = sys.argv[1:]
+path, name, package, version, upstream, copyleft = sys.argv[1:]
 text = open(path).read()
 fails = 0
 def check(cond, what):
@@ -36,10 +36,18 @@ check(f"name: {package}\n" in text, f"package {package}")
 check(f"version: {version}\n" in text, f"version {version}")
 check(f"upstream: {upstream}\n" in text, f"upstream {upstream}")
 check(re.search(r"uses: fredyk/sond-publish-action@v1\n\s+with:\n\s+bundle: \$\{\{ steps.build.outputs.bundle \}\}\n"
+                r"(\s+source-bundle: \$\{\{ steps.build.outputs.source_bundle \}\}\n)?"
                 r"\s+token: \$\{\{ secrets.SOND_PUBLISH_TOKEN \}\}\n"
                 r"\s+signing-key: \$\{\{ secrets.SOND_SIGNING_KEY \}\}\n", text) is not None,
       "publishes the bundle with the repository secrets")
 check("secrets." not in text.split("sond-publish-action@v1", 1)[0], "no secret reaches the build step")
+if copyleft:
+    # the licence opinion: the corresponding source goes out first, and the workflow file the
+    # fork adds carries the change notice like every other file it touches
+    check(re.search(r"\n\s+source-bundle: \$\{\{ steps.build.outputs.source_bundle \}\}\n", text) is not None,
+          "publishes the corresponding source first")
+    check(re.search(r"Modified by the Sond project, \d{4}-\d{2}-\d{2}", text) is not None,
+          "carries the change notice")
 sys.exit(1 if fails else 0)
 PY
 }
@@ -48,6 +56,8 @@ check toybox toybox-static "$TOYBOX_TAG" "github.com/landley/toybox@$TOYBOX_COMM
 check mksh mksh-static "${MKSH_TAG#mksh-}" "github.com/MirBSD/mksh@$MKSH_COMMIT"
 check musl musl "${MUSL_TAG#v}" "git.musl-libc.org/git/musl@$MUSL_COMMIT"
 check ncurses ncurses "$NCURSES_VERSION" "github.com/ThomasDickey/ncurses-snapshots@$NCURSES_COMMIT"
+check linux-headers linux-headers "${LINUX_HEADERS_TAG#v}" "github.com/sabotage-linux/kernel-headers@$LINUX_HEADERS_COMMIT" copyleft
+check htop htop "$HTOP_TAG" "github.com/htop-dev/htop@$HTOP_COMMIT" copyleft
 
 if [ "$fails" -eq 0 ]; then
 	printf 'test-fork-workflows: OK\n'
