@@ -14,7 +14,7 @@ fails=0
 ok() { printf 'ok   %s\n' "$1"; }
 bad() { printf 'FAIL %s\n' "$1"; fails=$((fails + 1)); }
 
-check() { # <fork> <package> <version> <upstream> [copyleft]
+check() { # <fork> <package> <version> <upstream> [copyleft|marked]
 	local name=$1 package=$2 version=$3 upstream=$4 copyleft=${5:-}
 	local wf=$here/forks/$name-sond.yml
 	[ -f "$wf" ] || { bad "$name: $wf exists"; return; }
@@ -41,11 +41,13 @@ check(re.search(r"uses: fredyk/sond-publish-action@v1\n\s+with:\n\s+bundle: \$\{
                 r"\s+signing-key: \$\{\{ secrets.SOND_SIGNING_KEY \}\}\n", text) is not None,
       "publishes the bundle with the repository secrets")
 check("secrets." not in text.split("sond-publish-action@v1", 1)[0], "no secret reaches the build step")
-if copyleft:
-    # the licence opinion: the corresponding source goes out first, and the workflow file the
-    # fork adds carries the change notice like every other file it touches
+if copyleft == "copyleft":
+    # the licence opinion: the corresponding source goes out first
     check(re.search(r"\n\s+source-bundle: \$\{\{ steps.build.outputs.source_bundle \}\}\n", text) is not None,
           "publishes the corresponding source first")
+if copyleft:
+    # copyleft or Apache-2.0 (4(b)): the workflow file the fork adds carries the change notice
+    # like every other file it touches
     check(re.search(r"Modified by the Sond project, \d{4}-\d{2}-\d{2}", text) is not None,
           "carries the change notice")
 sys.exit(1 if fails else 0)
@@ -58,6 +60,7 @@ check musl musl "${MUSL_TAG#v}" "git.musl-libc.org/git/musl@$MUSL_COMMIT"
 check ncurses ncurses "$NCURSES_VERSION" "github.com/ThomasDickey/ncurses-snapshots@$NCURSES_COMMIT"
 check linux-headers linux-headers "${LINUX_HEADERS_TAG#v}" "github.com/sabotage-linux/kernel-headers@$LINUX_HEADERS_COMMIT" copyleft
 check htop htop "$HTOP_VERSION" "github.com/htop-dev/htop@$HTOP_COMMIT" copyleft
+check incus incus "$INCUS_VERSION" "github.com/lxc/incus@$INCUS_COMMIT" marked
 
 if [ "$fails" -eq 0 ]; then
 	printf 'test-fork-workflows: OK\n'

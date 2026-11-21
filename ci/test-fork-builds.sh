@@ -15,7 +15,7 @@ action=${SOND_BUILD_ACTION:?set SOND_BUILD_ACTION to a sond-build-action checkou
 work=${SOND_CI_WORK:-$(mktemp -d)}
 mkdir -p "$work"
 forks=("$@")
-[ ${#forks[@]} -gt 0 ] || forks=(toybox mksh musl ncurses linux-headers htop)
+[ ${#forks[@]} -gt 0 ] || forks=(toybox mksh musl ncurses linux-headers htop incus)
 
 fails=0
 ok() { printf 'ok   %s\n' "$1"; }
@@ -180,6 +180,30 @@ for fork in "${forks[@]}"; do
 		out=$(TERM=xterm-256color "$b/payload/bin/htop" --version 2>&1 || true)
 		# the release's version, as upstream's tarball reports it: not git describe of the sond branch
 		[ "$(head -n1 <<<"$out")" = "htop $HTOP_TAG" ] && ok "htop: runs and reports $HTOP_TAG" || bad "htop: runs and reports $HTOP_TAG (got $out)"
+		;;
+	incus)
+		# the client only, pure Go (licence opinion 2.10 (a))
+		build_fork incus "$INCUS_URL" "$INCUS_TAG" "$INCUS_COMMIT"
+		[ -f "$work/incus/bundle" ] || continue
+		static_bin incus bin/incus
+		b=$(cat "$work/incus/bundle")
+		for f in COPYING go-LICENSE NOTICE; do has_file incus "share/licenses/incus/$f"; done
+		[ ! -e "$b/payload/share/licenses/incus/musl-COPYRIGHT" ] && ok "incus: no libc, no musl notice" || bad "incus: no libc, no musl notice"
+		[ -z "$(cat "$work/incus/source_bundle")" ] && ok "incus: permissive throughout, no source lane" || bad "incus: permissive throughout, no source lane"
+		for n in github.com/zitadel/oidc/v3 go.yaml.in/yaml/v4; do
+			grep -q "^==== $n " "$b/payload/share/licenses/incus/NOTICE" && ok "incus: NOTICE carries $n" || bad "incus: NOTICE carries $n"
+		done
+		bundled=$(sed -n '/^ *bundled *=/,/\]/p' "$b/MANIFEST")
+		for e in "go 1.26.9 BSD-3-Clause" "github.com/cyphar/filepath-securejoin v0.7.0 BSD-3-Clause" \
+			"github.com/opencontainers/go-digest v1.0.0 Apache-2.0" "github.com/muhlemmer/gu v0.3.1 Unlicense"; do
+			grep -qF "\"$e\"" <<<"$bundled" && ok "incus: bundled $e" || bad "incus: bundled $e"
+		done
+		# the opinion counted 71 modules linked into the client, plus Go itself
+		[ "$(grep -c '"' <<<"$bundled")" = 72 ] && ok "incus: bundled is Go and 71 modules" || bad "incus: bundled is Go and 71 modules ($(grep -c '"' <<<"$bundled"))"
+		# what upstream's own build reports: internal/version/flex.go says 7.6 for the v7.6.0 tag
+		out=$("$b/payload/bin/incus" --version 2>&1 || true)
+		want=$(sed -n 's/^var Version = "\(.*\)"$/\1/p' "$work/incus/src/internal/version/flex.go")
+		[ -n "$want" ] && [ "$out" = "$want" ] && ok "incus: runs and reports $want" || bad "incus: runs and reports $want (got $out)"
 		;;
 	*) bad "unknown fork $fork" ;;
 	esac

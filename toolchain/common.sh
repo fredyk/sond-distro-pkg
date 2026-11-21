@@ -76,6 +76,14 @@ HTOP_COMMIT=20882b8ef8271fb49ea0eb74bbfd484e9b0a11d8
 # no longer comes from git describe of the sond branch).
 HTOP_VERSION=3.5.3-r1
 
+# incus v7.6.0 is an annotated tag; its commit is pinned. The distro version carries -sond1: the
+# name stays incus without presenting the build as a Linux Containers release (opinion 2.10).
+INCUS_URL=https://github.com/fredyk/incus-sond
+INCUS_UPSTREAM=https://github.com/lxc/incus
+INCUS_TAG=v7.6.0
+INCUS_COMMIT=8f5e6c2235f6424ec59d3dc06f12e344a4a416e2
+INCUS_VERSION=7.6.0-sond1
+
 # ---------------------------------------------------------------------------
 # Reproducibility (RFC-0018): two clean builds, same bytes.
 # ---------------------------------------------------------------------------
