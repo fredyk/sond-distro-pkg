@@ -214,11 +214,36 @@ class CollectTest(unittest.TestCase):
         bundled, _ = self.collect()
         self.assertIn("golang.org/x/sys v0.49.0 BSD-3-Clause AND MPL-2.0", bundled)
 
+    def test_an_mpl_module_text_also_ships_where_the_rules_ask_for_it(self):
+        self.module("golang.org/x/sys@v0.49.0", {"LICENSE.MPL-2.0": MPL})
+        _, files = self.collect()
+        sources = [src for src, dest in files if dest == "share/licenses/incus/MPL-2.0"]
+        self.assertEqual(sources, [os.path.join(self.modcache, "golang.org/x/sys@v0.49.0",
+                                                "LICENSE.MPL-2.0")])
+
     def test_a_licence_outside_the_admitted_set_is_refused(self):
         self.module("golang.org/x/sys@v0.49.0", {"LICENSE": MPL})
         with self.assertRaisesRegex(PackagerError, "MPL-2.0"):
             golicences.collect("incus", self.info, self.modcache, self.goroot, self.out,
                                admitted=("Apache-2.0", "BSD-3-Clause"))
+
+    def test_several_binaries_union_their_modules(self):
+        second = os.path.join(self.root, "build-info-2.txt")
+        write_bytes(second, ("/src/.out/incus-agent: go1.26.9\n"
+                             "\tdep\tgolang.org/x/sys\tv0.49.0\th1:y=\n"
+                             "\tdep\tgithub.com/pkg/errors\tv0.9.1\th1:e=\n"
+                             "\tbuild\tCGO_ENABLED=0\n").encode())
+        self.module("github.com/pkg/errors@v0.9.1", {"LICENSE": BSD2})
+        bundled, _ = golicences.collect("incus", [self.info, second], self.modcache,
+                                        self.goroot, self.out)
+        self.assertEqual(bundled.count("golang.org/x/sys v0.49.0 BSD-3-Clause"), 1)
+        self.assertIn("github.com/pkg/errors v0.9.1 BSD-2-Clause", bundled)
+
+    def test_binaries_built_by_different_go_versions_are_refused(self):
+        second = os.path.join(self.root, "build-info-2.txt")
+        write_bytes(second, BUILD_INFO.replace("go1.26.9", "go1.26.8").encode())
+        with self.assertRaisesRegex(PackagerError, "1.26.8"):
+            golicences.collect("incus", [self.info, second], self.modcache, self.goroot, self.out)
 
     def test_goroot_without_licence_is_refused(self):
         os.remove(os.path.join(self.goroot, "LICENSE"))

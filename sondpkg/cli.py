@@ -268,7 +268,8 @@ def build_parser():
         "and licence-files.txt (FILE=DEST lines for --license-file) into --out",
     )
     child.add_argument("--name", required=True, help="the package name")
-    child.add_argument("--build-info", required=True, help="output of go version -m <binary>")
+    child.add_argument("--build-info", required=True, action="append",
+                       help="output of go version -m <binary>, once per binary")
     child.add_argument("--modcache", required=True, help="GOMODCACHE the binary was built with")
     child.add_argument("--goroot", required=True, help="GOROOT of the toolchain that built it")
     child.add_argument("--out", required=True)

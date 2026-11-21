@@ -32,6 +32,8 @@ _SIGNATURES = (
 _BSD = "redistribution and use in source and binary forms"
 _BSD_THIRD = ("neither the name", "may be used to endorse or promote")
 _BSD_BINARY = "redistributions in binary form must reproduce"
+# Texts the package rules ask for by name when a linked component is under them.
+_NAMED_TEXTS = ("MPL-2.0",)
 _ORDER = ("Apache-2.0", "MIT", "BSD-3-Clause", "BSD-2-Clause", "ISC", "Unlicense", "MPL-2.0")
 
 Reviewed = collections.namedtuple("Reviewed", "spdx ignore header_of reason")
@@ -126,8 +128,19 @@ def _write(path, text):
 
 
 def collect(package, build_info, modcache, goroot, out, admitted=None):
-    """Return ``(bundled_lines, [(source_file, destination), ...])`` for a pure Go binary."""
-    go_version, deps = parse_build_info(_read(build_info))
+    """Return ``(bundled_lines, [(source_file, destination), ...])`` for pure Go binaries.
+
+    ``build_info`` is one ``go version -m`` output file or a list of them, one per binary.
+    """
+    infos = [build_info] if isinstance(build_info, str) else list(build_info)
+    go_version, deps = None, []
+    for info in infos:
+        version, binary_deps = parse_build_info(_read(info))
+        if go_version not in (None, version):
+            raise PackagerError("the binaries were built by different Go toolchains (%s, %s)"
+                                % (go_version, version))
+        go_version = version
+        deps.extend(d for d in binary_deps if d not in deps)
     base = "share/licenses/%s" % package
     go_licence = os.path.join(goroot, "LICENSE")
     if not os.path.isfile(go_licence) or classify(_read(go_licence)) != "BSD-3-Clause":
@@ -135,6 +148,7 @@ def collect(package, build_info, modcache, goroot, out, admitted=None):
     bundled = ["go %s BSD-3-Clause" % go_version]
     files = [(go_licence, base + "/go-LICENSE")]
     notices = []
+    named = {}
     for module, version in deps:
         label = "%s@%s" % (module, version)
         directory = os.path.join(modcache, _escape(label))
@@ -155,6 +169,8 @@ def collect(package, build_info, modcache, goroot, out, admitted=None):
                     raise PackagerError("%s: %s is not a licence text this packager recognises"
                                         % (label, name))
                 found[name] = kind
+                if kind in _NAMED_TEXTS:
+                    named.setdefault(kind, os.path.join(directory, name))
             atoms = set()
             for kind in found.values():
                 atoms |= spdx.atoms(kind)
@@ -174,6 +190,7 @@ def collect(package, build_info, modcache, goroot, out, admitted=None):
         if not any(dest.startswith(target + "/") for _, dest in files):
             raise PackagerError("%s ships no licence text" % label)
         bundled.append("%s %s %s" % (module, version, expression))
+    files.extend((src, "%s/%s" % (base, text)) for text, src in sorted(named.items()))
     if notices:
         aggregated = os.path.join(out, "NOTICE")
         _write(aggregated, "".join(
