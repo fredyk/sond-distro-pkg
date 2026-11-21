@@ -357,6 +357,13 @@ class FetchTest(VerifyPublishedTest):
         self.assertTrue(os.path.isfile(os.path.join(licences, "LICENSE")))
         self.assertIn("object=" + self.object_id, out)
 
+    def test_it_reports_the_licence_and_the_source_of_what_it_installed(self):
+        rc, out, err = self.fetch()
+        self.assertEqual(rc, 0, err)
+        lines = out.splitlines()
+        self.assertIn("license=0BSD", lines)
+        self.assertTrue(any(l.startswith("source=github.com/fredyk/toybox-sond@") for l in lines), out)
+
     def test_the_log_key_is_required(self):
         rc, out, err = run_cli(["fetch", "toybox-static", "0.8.15", "--url", self.stub.url, "--into", self.tmp.name + "/s"])
         self.assertEqual(rc, 2)

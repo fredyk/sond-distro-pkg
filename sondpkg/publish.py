@@ -268,4 +268,10 @@ def fetch(name, version, url, log_key, into):
             raise PackagerError("the object is not in canonical form")
         os.makedirs(into, exist_ok=True)
         _install(os.path.join(bundle_dir, "payload"), into)
-    return ["object=" + object_id, "log_index=%d" % index, "tree_size=%d" % size]
+    return [
+        "object=" + object_id,
+        "log_index=%d" % index,
+        "tree_size=%d" % size,
+        "license=" + manifest.license,
+        "source=" + manifest.source,
+    ]

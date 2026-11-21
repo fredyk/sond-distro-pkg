@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from sondpkg import bundle, canon, changemarks, ed25519, publish
+from sondpkg import bundle, canon, canonical, changemarks, ed25519, publish, rules, spdx
 from sondpkg.errors import PackagerError
 
 
@@ -81,6 +81,23 @@ def _cmd_fetch(args):
     for line in publish.fetch(args.name, args.version, args.url, args.log_key, args.into):
         print(line)
     return 0
+
+
+def _cmd_object_id(args):
+    print(canonical.object_id(args.bundle))
+    return 0
+
+
+def _cmd_needs_source(args):
+    """Exit 0 when the licence or a bundled component obliges the source lane, 1 when not,
+    2 when an expression is malformed (an error is never a quiet no)."""
+    try:
+        expressions = [args.license] + [expr for _, _, expr in rules.parse_bundled(args.bundled)]
+        copyleft = any(spdx.is_copyleft(expr) for expr in expressions)
+    except PackagerError as error:
+        print("sondpkg: error: " + str(error), file=sys.stderr)
+        return 2
+    return 0 if copyleft else 1
 
 
 def build_parser():
@@ -189,7 +206,8 @@ def build_parser():
     child = subparsers.add_parser(
         "fetch",
         help="install a published package's payload into a sysroot, once its entry, object and "
-        "inclusion proof check out under the pinned log key; stdout: object=, log_index=, tree_size=",
+        "inclusion proof check out under the pinned log key; stdout: object=, log_index=, tree_size=, "
+        "license=, source=",
     )
     child.add_argument("name")
     child.add_argument("version")
@@ -197,6 +215,19 @@ def build_parser():
     child.add_argument("--log-key", required=True, help="the log public key (64 hex digits)")
     child.add_argument("--into", required=True, help="the sysroot; created when missing")
     child.set_defaults(func=_cmd_fetch)
+
+    child = subparsers.add_parser("object-id", help="print the object id (sha256:<hex>) of a bundle")
+    child.add_argument("bundle")
+    child.set_defaults(func=_cmd_object_id)
+
+    child = subparsers.add_parser(
+        "needs-source",
+        help="exit 0 if the licence or a bundled component is copyleft (GPL, LGPL, MPL), 1 if not, "
+        "2 on a malformed expression",
+    )
+    child.add_argument("license")
+    child.add_argument("--bundled", action="append", default=[], help='"name version SPDX-expression"')
+    child.set_defaults(func=_cmd_needs_source)
 
     return parser
 
