@@ -1,0 +1,51 @@
+# Modified by the Sond project, 2026-11-21
+# Builds the cowsql package (a static library, no binary) from this fork's sond
+# branch against the pinned musl and publishes it to dist.sond.dev, its
+# corresponding source first. Generated from fredyk/sond-distro-pkg ci/forks.
+name: sond package
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: cowsql
+          version: 1.15.9
+          license: LGPL-3.0-only WITH LGPL-3.0-linking-exception
+          upstream: github.com/cowsql/cowsql@783815b901470e27b7dfbcce3a67c888dad19e78
+          license-files: |
+            LICENSE
+            COPYING.LESSER=share/licenses/cowsql/LGPL-3.0
+            COPYING=share/licenses/cowsql/GPL-3.0
+          depends: |
+            raft 0.22.1
+            libuv 1.53.0
+            sqlite 3.54.1
+          build: |
+            # LICENSE is upstream's LGPL-3.0 with the static linking exception; COPYING and
+            # COPYING.LESSER are gnu.org's GPL-3.0 and LGPL-3.0 texts, which LGPL-3.0 asks for.
+            autoreconf -i
+            ./configure --prefix=/ --disable-shared --enable-static \
+              CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static"
+            make -j"$(nproc)"
+            make install DESTDIR="$SOND_PAYLOAD"
+            rm -f "$SOND_PAYLOAD"/lib/*.la
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}

@@ -236,6 +236,22 @@ class RejectionTest(unittest.TestCase):
                          source_object="sha256:" + "c" * 64)
         self.reject(argv, "share/licenses/toybox-static/LGPL-2.1")
 
+    def lgpl3_library_args(self, files):
+        texts = [make_licence(self.root, n, n + " text\n") for n in files + ["musl-COPYRIGHT"]]
+        return base_args(self.root, self.tree, self.out, name="raft",
+                         license="LGPL-3.0-only WITH LGPL-3.0-linking-exception",
+                         linkage="static musl 1.2.5 (MIT)", license_files=texts,
+                         source_object="sha256:" + "c" * 64)
+
+    def test_reject_an_lgpl3_package_without_the_gpl3_text(self):
+        # LGPL-3.0 is a set of additional permissions on GPL-3.0: both texts go with the library
+        self.reject(self.lgpl3_library_args(["LICENSE", "LGPL-3.0"]), "share/licenses/raft/GPL-3.0")
+        self.reject(self.lgpl3_library_args(["LICENSE", "GPL-3.0"]), "share/licenses/raft/LGPL-3.0")
+
+    def test_an_lgpl3_package_with_both_texts_packages(self):
+        rc, _, err = run_cli(self.lgpl3_library_args(["LICENSE", "LGPL-3.0", "GPL-3.0"]))
+        self.assertEqual(rc, 0, err)
+
     def test_reject_malformed_or_unadmitted_bundled_components(self):
         self.reject(self.htop_args(bundled=["ncurses"]), "bundled")
         self.reject(self.htop_args(bundled=["ncurses 6.6 SSPL-1.0", "musl 1.2.5 MIT"]), "SSPL-1.0")

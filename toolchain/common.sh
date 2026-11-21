@@ -96,6 +96,17 @@ SQLITE_UPSTREAM=https://github.com/sqlite/sqlite
 SQLITE_TAG=version-3.54.1
 SQLITE_COMMIT=57520227c95396ce39ba6ecaac8d475b78dd3964
 
+# raft v0.22.1 and cowsql v1.15.9 (lightweight tags): incusd's distributed SQLite. Their forks add
+# gnu.org's GPL-3.0 and LGPL-3.0 texts (COPYING, COPYING.LESSER), which LGPL-3.0 asks for.
+RAFT_URL=https://github.com/fredyk/raft-sond
+RAFT_UPSTREAM=https://github.com/cowsql/raft
+RAFT_TAG=v0.22.1
+RAFT_COMMIT=9edb176a7924ce2b943cb56552366dc4b5a1a6b7
+COWSQL_URL=https://github.com/fredyk/cowsql-sond
+COWSQL_UPSTREAM=https://github.com/cowsql/cowsql
+COWSQL_TAG=v1.15.9
+COWSQL_COMMIT=783815b901470e27b7dfbcce3a67c888dad19e78
+
 # ---------------------------------------------------------------------------
 # Reproducibility (RFC-0018): two clean builds, same bytes.
 # ---------------------------------------------------------------------------

@@ -154,6 +154,21 @@ def required_licence_files(name, linkage, license=None, bundled=None):
                 "the licence opinion lists %s among %s's licence texts" % (text, name),
             )
         )
+    # The package's own licence obliges the same texts as when it is linked into another
+    # (LGPL-3.0 is a set of additional permissions on GPL-3.0; both go with the library), unless
+    # the licence opinion fixed the package's texts by name.
+    own = []
+    for atom in spdx.atoms(license) if license and name not in PACKAGE_TEXTS else ():
+        for pattern, files in _BUNDLED_TEXTS:
+            if pattern.match(atom):
+                own.extend(f for f in files if f not in own)
+    for text in own:
+        required.append(
+            (
+                "share/licenses/%s/%s" % (name, text),
+                "the package is licensed under %s, whose text must ship" % license,
+            )
+        )
     texts = []
     for component, _, expression in parse_bundled(bundled):
         if component == "ncurses":

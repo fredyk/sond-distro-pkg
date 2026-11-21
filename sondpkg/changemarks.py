@@ -29,6 +29,8 @@ LICENCE_TEXTS = {
     "efbaee946ac92a48b89eae36f655844042370d2f0e04eadea1e2998efae24ebd": _KERNEL + "LICENSES/preferred/LGPL-2.1",
     "323c587d0ccf10e376f8bf9a7f31fb4ca6078105194b42e0b1e0ee2bc9bde71f": _KERNEL + "LICENSES/preferred/MIT",
     "7a83b1aeb460458db9a4bd521d7f237c45b1650f6e60ea5ffc71e49472454de3": _KERNEL + "LICENSES/preferred/BSD-3-Clause",
+    "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986": "https://www.gnu.org/licenses/gpl-3.0.txt",
+    "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118": "https://www.gnu.org/licenses/lgpl-3.0.txt",
 }
 
 

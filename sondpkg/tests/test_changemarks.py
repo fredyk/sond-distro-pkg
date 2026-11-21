@@ -113,6 +113,15 @@ class ChangeMarkTest(unittest.TestCase):
         ):
             self.assertIn(digest, changemarks.LICENCE_TEXTS)
 
+    def test_the_gnu_licence_texts_are_known(self):
+        # gnu.org/licenses/gpl-3.0.txt and lgpl-3.0.txt, the texts raft and cowsql's forks add
+        from sondpkg import changemarks
+        for digest in (
+            "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+            "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118",
+        ):
+            self.assertIn(digest, changemarks.LICENCE_TEXTS)
+
     def test_deleted_file_is_reported_but_not_a_failure(self):
         os.remove(os.path.join(self.repo, "gone.c"))
         rc, out, err = run_cli(["check-change-marks", self.repo, self.commit])

@@ -15,7 +15,7 @@ action=${SOND_BUILD_ACTION:?set SOND_BUILD_ACTION to a sond-build-action checkou
 work=${SOND_CI_WORK:-$(mktemp -d)}
 mkdir -p "$work"
 forks=("$@")
-[ ${#forks[@]} -gt 0 ] || forks=(toybox mksh musl ncurses linux-headers htop incus libuv sqlite)
+[ ${#forks[@]} -gt 0 ] || forks=(toybox mksh musl ncurses linux-headers htop incus libuv sqlite raft cowsql)
 
 fails=0
 ok() { printf 'ok   %s\n' "$1"; }
@@ -225,6 +225,24 @@ for fork in "${forks[@]}"; do
 		static_bin sqlite bin/sqlite3
 		out=$("$b/payload/bin/sqlite3" :memory: 'select sqlite_version();' 2>&1 || true)
 		[ "$out" = "${SQLITE_TAG#version-}" ] && ok "sqlite: runs and reports ${SQLITE_TAG#version-}" || bad "sqlite: runs and reports ${SQLITE_TAG#version-} (got $out)"
+		;;
+	raft | cowsql)
+		# LGPL-3.0 with the static linking exception: static libraries, their source published first
+		pin=$(tr a-z A-Z <<<"$fork")
+		url=${pin}_URL tag=${pin}_TAG commit=${pin}_COMMIT
+		build_fork "$fork" "${!url}" "${!tag}" "${!commit}"
+		[ -f "$work/$fork/bundle" ] || continue
+		b=$(cat "$work/$fork/bundle")
+		for f in "lib/lib$fork.a" "include/$fork.h" "lib/pkgconfig/$fork.pc" \
+			"share/licenses/$fork/LICENSE" "share/licenses/$fork/LGPL-3.0" "share/licenses/$fork/GPL-3.0"; do has_file "$fork" "$f"; done
+		[ -z "$(find "$b/payload" -name '*.so*')" ] && ok "$fork: static only" || bad "$fork: static only"
+		grep -q '^ *license *= *"LGPL-3.0-only WITH LGPL-3.0-linking-exception"' "$b/MANIFEST" &&
+			ok "$fork: licence LGPL-3.0-only WITH LGPL-3.0-linking-exception" || bad "$fork: licence ($(grep '^ *license' "$b/MANIFEST"))"
+		# a static library links nothing: its dependencies are only compiled against
+		! grep -q '^ *bundled' "$b/MANIFEST" && ok "$fork: bundles nothing" || bad "$fork: bundles nothing ($(grep -A4 bundled "$b/MANIFEST"))"
+		src=$(cat "$work/$fork/source_bundle")
+		[ -n "$src" ] && python3 "$distro/sondpkg/bin/sondpkg" verify-bundle "$src" >/dev/null &&
+			ok "$fork: the corresponding source bundle verifies" || bad "$fork: the corresponding source bundle verifies"
 		;;
 	*) bad "unknown fork $fork" ;;
 	esac
