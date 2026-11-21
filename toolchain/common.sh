@@ -9,7 +9,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Contract data roots (02-contrato.md section A). Written by this area only.
 # ---------------------------------------------------------------------------
-FORKS=/tank/tmp/gr4v5ond7/forks
+FORKS=${SOND_FORKS:-/tank/tmp/gr4v5ond7/forks}
 SRC_ROOT=$FORKS/src
 PREFIX=$FORKS/toolchain
 ARTIFACTS=$FORKS/artifacts
@@ -29,24 +29,25 @@ BUILD_A=$WORK_ROOT/a
 BUILD_B=$WORK_ROOT/b
 
 # ---------------------------------------------------------------------------
-# Pinned upstream revisions (measured with ls-remote on 2026-11-18).
+# Pinned revisions. Every tree is cloned from fredyk's GitHub fork
+# (fredyk/<name>-sond, made 2026-11-21 with secretd-github fork); the upstream
+# is kept only as provenance. Each fork's release tag resolves to the pinned
+# commit (test-sources-are-forks.sh reads it with ls-remote).
 # ---------------------------------------------------------------------------
-TOYBOX_URL=https://github.com/landley/toybox
+TOYBOX_URL=https://github.com/fredyk/toybox-sond
+TOYBOX_UPSTREAM=https://github.com/landley/toybox
 TOYBOX_TAG=0.8.15
 TOYBOX_COMMIT=a57b091d05ec366dcd4dd737784c03761cb6a4b1
 
-MKSH_URL=https://github.com/MirBSD/mksh
+MKSH_URL=https://github.com/fredyk/mksh-sond
+MKSH_UPSTREAM=https://github.com/MirBSD/mksh
 MKSH_TAG=mksh-R59
 MKSH_COMMIT=8deec0b465ed59108331b0a112564f2a89156536
 
-# musl is built from its release tarball, not from the git checkout: a full
-# clone of git.musl-libc.org takes over 5 minutes here, the tarball takes
-# 2.4 s, and the NFS copy of the checkout is corrupt. The tarball still
-# corresponds to the pinned commit; the clone under SRC_ROOT is kept only as
-# provenance.
-MUSL_URL=https://musl.libc.org/releases/musl-1.2.5.tar.gz
-MUSL_TARBALL=musl-1.2.5.tar.gz
-MUSL_TARBALL_SHA256=a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4
+# musl's own server is slow to clone (over 5 minutes); its GitHub fork is not,
+# so musl is built from the fork's pinned tree like the other two.
+MUSL_URL=https://github.com/fredyk/musl-sond
+MUSL_UPSTREAM=https://git.musl-libc.org/git/musl
 MUSL_TAG=v1.2.5
 MUSL_COMMIT=0784374d561435f7c787a555aeab8ede699ed298
 

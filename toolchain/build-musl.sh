@@ -1,38 +1,29 @@
 #!/bin/bash
-# Build musl 1.2.5 from its release tarball into a private prefix, with no root.
+# Build musl 1.2.5 from its fork's pinned tree into a private prefix, with no root.
 #
 # usage: build-musl.sh
 #
-# The tarball is downloaded once into $WORK_ROOT, its sha256 is checked against
-# the pinned value in common.sh, and musl is configured with --prefix=$PREFIX
-# and --disable-shared. The result is proven before the script exits: musl-gcc
-# must exist, a hello.c compiled with it must be statically linked, and the
-# binary must run on this host.
+# The tree is a fresh copy of the commit pinned in common.sh, taken from the
+# fork clone build-forks.sh made (never a working tree that may hold other
+# files), and musl is configured with --prefix=$PREFIX and --disable-shared.
+# The result is proven before the script exits: musl-gcc must exist, a hello.c
+# compiled with it must be statically linked, and the binary must run on this
+# host.
 
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-TARBALL=$WORK_ROOT/$MUSL_TARBALL
+FORK=$SRC_ROOT/musl-sond
 SRC=$WORK_ROOT/src/musl-1.2.5
 MUSL_GCC=$PREFIX/bin/musl-gcc
 
-mkdir -p "$WORK_ROOT/src"
-
-if [ ! -f "$TARBALL" ]; then
-	printf 'downloading %s\n' "$MUSL_URL"
-	curl -fsSL -o "$TARBALL" "$MUSL_URL"
-fi
-
-HAVE=$(sha256sum "$TARBALL" | cut -d' ' -f1)
-if [ "$HAVE" != "$MUSL_TARBALL_SHA256" ]; then
-	printf 'error: %s has sha256 %s, expected %s\n' \
-		"$TARBALL" "$HAVE" "$MUSL_TARBALL_SHA256" >&2
+if ! git -C "$FORK" cat-file -e "$MUSL_COMMIT^{commit}" 2>/dev/null; then
+	printf 'error: %s has no commit %s, run build-forks.sh first\n' "$FORK" "$MUSL_COMMIT" >&2
 	exit 1
 fi
-
-if [ ! -f "$SRC/configure" ]; then
-	tar -xzf "$TARBALL" -C "$WORK_ROOT/src"
-fi
+rm -rf -- "$SRC"
+mkdir -p "$SRC"
+git -C "$FORK" archive "$MUSL_COMMIT" | tar -x -C "$SRC"
 
 printf 'configuring musl with --prefix=%s --disable-shared\n' "$PREFIX"
 (cd "$SRC" && ./configure --prefix="$PREFIX" --disable-shared)

@@ -15,7 +15,8 @@
 # nothing is invented and no failure is hidden.
 set -euo pipefail
 
-ROOT=/tank/tmp/gr4v5ond7/forks
+REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+ROOT=${SOND_FORKS:-/tank/tmp/gr4v5ond7/forks}
 INTEG=$ROOT/integ
 BUNDLES=$INTEG/bundles
 SRCDIR=$INTEG/manifest-material
@@ -23,7 +24,7 @@ STAGE=$INTEG/stage
 TREEDIR=$INTEG/rootfs
 DISKDIR=$INTEG/disk
 SERIAL=$INTEG/qemu-serial.log
-VERIFY_DIR=/home/fred/dev/projects/sond-distro-pkg.oc-integracion-sond/verify
+VERIFY_DIR=$REPO/verify
 
 ART=$ROOT/artifacts
 TOYBOX_BIN=$ART/bin/toybox
@@ -48,13 +49,13 @@ TOYBOX_SYMLINKS="ls ps cat cp mv rm mkdir mount echo grep"
 TOYBOX_APPLETS="cat cp echo grep ls mkdir mount mv ps rm"
 
 # Image area scripts, used directly: READY-image was never published.
-IM_WORKTREE=/home/fred/dev/projects/sond-distro-pkg.oc-image-seabios
+IM_WORKTREE=$REPO
 IM_BUILD=$IM_WORKTREE/image/build-disk.sh
 IM_BOOT=$IM_WORKTREE/image/run-qemu.sh
 
 # Packager: READY-packager is the only READY marker that exists.
-PKG_TOOL=/home/fred/dev/projects/sond-distro-pkg.oc-packager-rfc18/sondpkg/bin/sondpkg
-PKG_TESTS="python3 -m unittest discover -s /home/fred/dev/projects/sond-distro-pkg.oc-packager-rfc18/sondpkg/tests -t /home/fred/dev/projects/sond-distro-pkg.oc-packager-rfc18"
+PKG_TOOL=$REPO/sondpkg/bin/sondpkg
+PKG_TESTS="python3 -m unittest discover -s $REPO/sondpkg/tests -t $REPO"
 
 say() { printf 'verify: %s\n' "$*"; }
 die() { printf 'verify: FAIL: %s\n' "$*" >&2; exit 1; }
@@ -84,7 +85,7 @@ need_file "$PKG_TOOL"
 [ -x "$PKG_TOOL" ] || die "packager tool is not executable: $PKG_TOOL"
 need_file "$IM_BUILD"; need_file "$IM_BOOT"
 # The image area's scripts are not marked executable; call them through bash.
-need_file /tank/tmp/e07e7e91/kbuild/bzImage-6.18.64-sond
+need_file "${SOND_KERNEL:-/tank/tmp/e07e7e91/kbuild/bzImage-6.18.64-sond}"
 
 # If the READY marker is present it must agree with the measured tool path.
 if [ -f "$READY_PK" ]; then
@@ -171,7 +172,7 @@ for name in toybox mksh musl; do
 done
 
 # Toolchain recipes from the toolchain worktree.
-TC_WORKTREE=/home/fred/dev/projects/sond-distro-pkg.oc-toolchain-musl
+TC_WORKTREE=$REPO
 shopt -s nullglob
 RECIPES=("$TC_WORKTREE"/toolchain/build-*.sh)
 shopt -u nullglob
