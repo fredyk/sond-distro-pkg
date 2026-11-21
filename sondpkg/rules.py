@@ -245,7 +245,9 @@ def _check_go_modules(name, payload, bundled):
         with open(aggregated, encoding="utf-8", errors="replace") as handle:
             notice_text = handle.read()
     for module, version, _ in parse_bundled(bundled):
-        if module == "go":
+        # A Go module's version is always v-prefixed semver; anything else bundled is the
+        # toolchain or a C component a cgo binary links (its licences ship as <dep>-<file>).
+        if module == "go" or not version.startswith("v"):
             continue
         relative = "share/licenses/%s/go/%s@%s/" % (name, module, version)
         directory = os.path.join(payload, *relative.rstrip("/").split("/"))

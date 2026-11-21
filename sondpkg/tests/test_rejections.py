@@ -326,6 +326,17 @@ class GoRejectionTest(unittest.TestCase):
         self.reject(self.args(drop=drop | {"share/licenses/incus/NOTICE"}),
                     "share/licenses/incus/go/%s@v3.51.16/" % self.MODULE)
 
+    def test_a_cgo_package_bundles_c_components_beside_its_modules(self):
+        # cgo (dictamen 2.10 (b)): a C component (version without the v of a Go module) ships
+        # its licences beside the package's, not under go/.
+        self.files["share/licenses/incus/musl-COPYRIGHT"] = "musl MIT text\n"
+        self.files["share/licenses/incus/libcap-License"] = "libcap BSD-3-Clause text\n"
+        rc, _, err = run_cli(self.args(
+            linkage="static Go 1.26.9 + musl 1.2.5 (MIT), cgo",
+            bundled=["go 1.26.9 BSD-3-Clause", self.MODULE + " v3.51.16 Apache-2.0",
+                     "libcap 1.2.78 BSD-3-Clause", "musl 1.2.5 MIT"]))
+        self.assertEqual(rc, 0, err)
+
     def test_reject_a_module_notice_missing_from_the_aggregated_notice(self):
         self.files["share/licenses/incus/NOTICE"] = "something else\n"
         self.reject(self.args(), "NOTICE")
