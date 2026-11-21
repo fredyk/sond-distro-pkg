@@ -57,7 +57,7 @@ Prints the parsed manifest as `key = value` lines (arrays joined with `, `).
 ### `check-change-marks <fork-worktree> <upstream-sha40>`
 
 Runs `git diff --name-status <sha> -- .` in the fork and fails, listing every
-modified or added file whose content lacks `Sond change <YYYY-MM-DD>:`. Deleted
+modified or added file whose content lacks `Modified by the Sond project, <YYYY-MM-DD>`, and fails when the upstream sha is not a commit (`git cat-file -t`). Deleted
 files are printed (`deleted: <path>`) but are not a failure. Read-only.
 
 ### `keygen --out FILE`
@@ -109,7 +109,7 @@ No network, no root, everything written under a `tempfile`.
 - Existing bundle: rejected, never overwritten.
 - Empty or missing `--tree`: rejected.
 - Sources: exactly the `--source-file` list is recorded; for a musl-linked package the caller also passes the musl source tarball (the `musl-COPYRIGHT` presence is what is enforced mechanically).
-- Change mark: `Sond change <YYYY-MM-DD>:` anywhere in the file; deletions only reported.
+- Change mark: `Modified by the Sond project, <YYYY-MM-DD>` anywhere in the file (dictamen, section 3 step 6); deletions only reported.
 - Package version: the upstream version with no distro suffix (`0.8.15`, `R59`, `1.2.5`).
 - `cd` is a shell builtin of mksh, not a shipped `bin/cd`.
 - Scope: local bundles only; no upload, no registry, no `Provides`/`Depends` graph.

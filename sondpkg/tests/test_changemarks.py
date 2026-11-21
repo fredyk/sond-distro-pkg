@@ -54,7 +54,7 @@ class ChangeMarkTest(unittest.TestCase):
     def test_unmarked_modification_fails_naming_only_it(self):
         write_bytes(
             os.path.join(self.repo, "good.c"),
-            b"/* Sond change 2026-11-18: tweak - fredyk/x-sond */\nint a;\n",
+            b"/* Modified by the Sond project, 2026-11-18: tweak */\nint a;\n",
         )
         write_bytes(os.path.join(self.repo, "bad.c"), b"int b = 2;\n")
         rc, _, err = run_cli(["check-change-marks", self.repo, self.commit])
@@ -65,11 +65,11 @@ class ChangeMarkTest(unittest.TestCase):
     def test_all_marked_passes(self):
         write_bytes(
             os.path.join(self.repo, "good.c"),
-            b"/* Sond change 2026-11-18: tweak - fredyk/x-sond */\nint a;\n",
+            b"/* Modified by the Sond project, 2026-11-18: tweak */\nint a;\n",
         )
         write_bytes(
             os.path.join(self.repo, "bad.c"),
-            b"# Sond change 2026-11-19: fix - fredyk/x-sond\nint b = 2;\n",
+            b"# Modified by the Sond project, 2026-11-19\nint b = 2;\n",
         )
         rc, _, err = run_cli(["check-change-marks", self.repo, self.commit])
         self.assertEqual(rc, 0, err)
@@ -86,6 +86,21 @@ class ChangeMarkTest(unittest.TestCase):
         rc, _, err = run_cli(["check-change-marks", self.repo, self.commit])
         self.assertNotEqual(rc, 0)
         self.assertIn("new.c", err)
+
+    def test_the_old_internal_mark_is_not_the_notice_the_licence_asks_for(self):
+        write_bytes(os.path.join(self.repo, "bad.c"), b"/* Sond change 2026-11-18: x */\nint b = 2;\n")
+        rc, _, err = run_cli(["check-change-marks", self.repo, self.commit])
+        self.assertNotEqual(rc, 0)
+        self.assertIn("bad.c", err)
+        self.assertIn("Modified by the Sond project", err)
+
+    def test_an_annotated_tag_is_not_an_upstream_commit(self):
+        git(self.repo, "-c", "user.name=t", "-c", "user.email=t@t", "tag", "-a", "v1", "-m", "v1", self.commit)
+        tag = git(self.repo, "rev-parse", "v1").strip()
+        self.assertNotEqual(tag, self.commit)
+        rc, _, err = run_cli(["check-change-marks", self.repo, tag])
+        self.assertNotEqual(rc, 0)
+        self.assertIn("not a commit", err)
 
     def test_bad_commit_argument_is_rejected(self):
         rc, _, err = run_cli(["check-change-marks", self.repo, "not-a-sha"])

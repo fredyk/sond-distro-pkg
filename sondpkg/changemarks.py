@@ -1,5 +1,9 @@
 """check-change-marks: every file the fork touches carries a dated mark.
 
+The mark is the notice GPL-2.0 2(a), GPL-3.0 5(a) and Apache-2.0 4(b) ask for, worded as the
+licence opinion fixes it (dictamen-licencias-paquetes-distro-sond.md, section 3, step 6):
+"Modified by the Sond project, YYYY-MM-DD". The upstream must be a commit, never a tag object.
+
 Read-only: the fork worktree is never modified, only diffed against upstream.
 """
 
@@ -10,7 +14,7 @@ import sys
 
 from sondpkg.errors import PackagerError
 
-MARK = re.compile(rb"Sond change \d{4}-\d{2}-\d{2}:")
+MARK = re.compile(rb"Modified by the Sond project, \d{4}-\d{2}-\d{2}")
 _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -40,6 +44,14 @@ def check_change_marks(fork, commit):
     if not _COMMIT_RE.match(commit or ""):
         raise PackagerError(
             "upstream commit must be a 40-hex sha, got: %r" % commit
+        )
+
+    kind = subprocess.run(
+        ["git", "-C", fork, "cat-file", "-t", commit], capture_output=True, text=True
+    ).stdout.strip()
+    if kind != "commit":
+        raise PackagerError(
+            "upstream %s is not a commit in %s (git cat-file -t: %s)" % (commit, fork, kind or "missing")
         )
 
     modified = []
@@ -72,7 +84,7 @@ def check_change_marks(fork, commit):
         for relative in unmarked:
             print("missing change mark: " + relative, file=sys.stderr)
         raise PackagerError(
-            'files modified without a "Sond change <YYYY-MM-DD>:" mark: '
+            'files modified without a "Modified by the Sond project, <YYYY-MM-DD>" mark: '
             + ", ".join(unmarked)
         )
     return unmarked, deleted
