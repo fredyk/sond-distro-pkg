@@ -60,6 +60,28 @@ Runs `git diff --name-status <sha> -- .` in the fork and fails, listing every
 modified or added file whose content lacks `Sond change <YYYY-MM-DD>:`. Deleted
 files are printed (`deleted: <path>`) but are not a failure. Read-only.
 
+### `keygen --out FILE`
+
+Writes a new Ed25519 private key to FILE (mode 0600, never over an existing file) and prints the
+public key as 64 hex digits. **Key file format:** the 32-byte private seed as 64 lowercase hex
+digits plus a newline. The first publish of a name fixes its publisher key (TOFU): keep the file.
+
+### `publish <bundle> --url URL --token-file F --key-file F`
+
+Builds the canonical object of the bundle (a deterministic ustar archive, see
+`sondpkg/canonical.py`), signs a log entry (name, version, content hash, publisher key, licence,
+timestamp) and POSTs both to `URL/publish` with the Bearer token. stdout carries **only**
+`object=sha256:<hex>`, `log_index=<n>`, `tree_size=<n>`; everything else goes to stderr.
+Exit codes: **0** published, **3** the same name, version and object was already logged (the
+three lines are still printed), **1** any other failure.
+
+### `verify-published <bundle> --url URL [--log-key HEX]`
+
+Exits 0 only if the bundle's entry is in the log with a valid publisher signature, names this
+bundle's object hash, the stored object hashes to it, and the inclusion proof checks out against
+a tree head signed by the log key (`--log-key` pins it; by default the key is asked of the
+registry, which proves integrity but not who runs it).
+
 ## tests
 
 ```
