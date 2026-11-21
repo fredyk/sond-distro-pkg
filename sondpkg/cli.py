@@ -3,7 +3,11 @@
 import argparse
 import sys
 
-from sondpkg import bundle, canon, canonical, changemarks, ed25519, publish, rules, spdx
+import os
+
+from sondpkg import (
+    bundle, canon, canonical, changemarks, ed25519, golicences, publish, rules, spdx,
+)
 from sondpkg.errors import PackagerError
 
 
@@ -13,6 +17,18 @@ def _parse_license_files(specs):
         source, separator, destination = spec.partition("=")
         files.append((source, destination if separator else None))
     return files
+
+
+def _cmd_go_licences(args):
+    bundled, files = golicences.collect(
+        args.name, args.build_info, args.modcache, args.goroot, args.out)
+    os.makedirs(args.out, exist_ok=True)
+    with open(os.path.join(args.out, "bundled.txt"), "w", encoding="utf-8", newline="\n") as out:
+        out.writelines(line + "\n" for line in bundled)
+    with open(os.path.join(args.out, "licence-files.txt"), "w", encoding="utf-8",
+              newline="\n") as out:
+        out.writelines("%s=%s\n" % (os.path.abspath(src), dest) for src, dest in files)
+    return 0
 
 
 def _cmd_hash_tree(args):
@@ -245,6 +261,18 @@ def build_parser():
     child.add_argument("--include", required=True, help="the include directory the headers are in")
     child.add_argument("header", nargs="*", help="paths relative to --include")
     child.set_defaults(func=_cmd_linux_header_notices)
+
+    child = subparsers.add_parser(
+        "go-licences",
+        help="read the licences of a pure Go binary's toolchain and modules; write bundled.txt "
+        "and licence-files.txt (FILE=DEST lines for --license-file) into --out",
+    )
+    child.add_argument("--name", required=True, help="the package name")
+    child.add_argument("--build-info", required=True, help="output of go version -m <binary>")
+    child.add_argument("--modcache", required=True, help="GOMODCACHE the binary was built with")
+    child.add_argument("--goroot", required=True, help="GOROOT of the toolchain that built it")
+    child.add_argument("--out", required=True)
+    child.set_defaults(func=_cmd_go_licences)
 
     return parser
 

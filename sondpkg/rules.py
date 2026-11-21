@@ -68,7 +68,10 @@ def validate_metadata(name, version, license, source, upstream, linkage, tier):
 # The source bundle of a package: what it ships is the source, so it needs none of its own.
 SOURCE_LINKAGE = "source"
 _SOURCE_OBJECT_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
-_BUNDLED_RE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._+-]*) (\S+) (.+)$")
+# A component name is a library name or a Go module path (github.com/zitadel/oidc/v3).
+_BUNDLED_RE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._+/~-]*) (\S+) (.+)$")
+# A pure Go binary links the Go toolchain's runtime and its modules (dictamen 2.10 (a)).
+_GO_LINKAGE = re.compile(r"\bGo\b")
 # Packages whose linked components are fixed by the licence opinion: anything else
 # linked in is refused until its licence has been read (dictamen 2.9).
 PINNED_BUNDLED = {"htop": frozenset({"ncurses", "musl"})}
@@ -100,6 +103,8 @@ def validate_linking(name, license, linkage, bundled, source_object):
     names = {component for component, _, _ in components}
     if components and "musl" in (linkage or "").lower() and "musl" not in names:
         raise PackagerError('linkage "%s" links musl, but bundled does not list it' % linkage)
+    if _GO_LINKAGE.search(linkage or "") and "go" not in names:
+        raise PackagerError('linkage "%s" is a Go binary, but bundled does not list go' % linkage)
     pinned = PINNED_BUNDLED.get(name)
     if pinned is not None and names != pinned:
         raise PackagerError(
@@ -126,6 +131,20 @@ def required_licence_files(name, linkage, license=None, bundled=None):
             (
                 "share/licenses/%s/COPYING" % name,
                 "a GPL licence must ship its upstream COPYING unchanged",
+            )
+        )
+    elif license and "Apache-2.0" in spdx.atoms(license):
+        required.append(
+            (
+                "share/licenses/%s/COPYING" % name,
+                "Apache-2.0 4(a): every recipient gets a copy of the License",
+            )
+        )
+    if _GO_LINKAGE.search(linkage or ""):
+        required.append(
+            (
+                "share/licenses/%s/go-LICENSE" % name,
+                "a Go binary carries the Go runtime, whose BSD-3-Clause notice must ship",
             )
         )
     for text in PACKAGE_TEXTS.get(name, ()):
@@ -192,9 +211,40 @@ def check_payload(name, linkage, payload, license=None, bundled=None):
         path = os.path.join(payload, *relative.split("/"))
         if not os.path.isfile(path):
             raise PackagerError("missing licence file %s: %s" % (relative, reason))
+    if _GO_LINKAGE.search(linkage or ""):
+        _check_go_modules(name, payload, bundled)
     if name in COMPUTED_LICENSE:
         computed = COMPUTED_LICENSE[name](payload)
         if license != computed:
             raise PackagerError(
                 'license of %s is computed from its payload: "%s", not "%s"' % (name, computed, license)
             )
+
+
+def _check_go_modules(name, payload, bundled):
+    """Each linked module ships its licence files; each NOTICE is in the aggregated NOTICE."""
+    base = os.path.join(payload, "share", "licenses", name)
+    aggregated = os.path.join(base, "NOTICE")
+    notice_text = None
+    if os.path.isfile(aggregated):
+        with open(aggregated, encoding="utf-8", errors="replace") as handle:
+            notice_text = handle.read()
+    for module, version, _ in parse_bundled(bundled):
+        if module == "go":
+            continue
+        relative = "share/licenses/%s/go/%s@%s/" % (name, module, version)
+        directory = os.path.join(payload, *relative.rstrip("/").split("/"))
+        names = sorted(os.listdir(directory)) if os.path.isdir(directory) else []
+        if not names:
+            raise PackagerError(
+                "missing licence files in %s: every Go module linked in ships its licence and "
+                "notices" % relative
+            )
+        for notice in (n for n in names if n.upper().startswith("NOTICE")):
+            with open(os.path.join(directory, notice), encoding="utf-8", errors="replace") as handle:
+                text = handle.read().strip()
+            if notice_text is None or text not in notice_text:
+                raise PackagerError(
+                    "share/licenses/%s/NOTICE lacks %s%s: Apache-2.0 4(d) asks for a readable "
+                    "copy of every included NOTICE" % (name, relative, notice)
+                )

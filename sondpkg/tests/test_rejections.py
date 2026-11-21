@@ -229,8 +229,9 @@ class RejectionTest(unittest.TestCase):
 
     def test_reject_linked_lgpl_without_its_text(self):
         musl = make_licence(self.root, "musl-COPYRIGHT", "MIT text\n")
+        apache = make_licence(self.root, "COPYING", "Apache-2.0 text\n")
         argv = base_args(self.root, self.tree, self.out,
-                         license="Apache-2.0", license_files=[musl],
+                         license="Apache-2.0", license_files=[musl, apache],
                          bundled=["lxc 6.0.5 LGPL-2.1-or-later", "musl 1.2.5 MIT"],
                          source_object="sha256:" + "c" * 64)
         self.reject(argv, "share/licenses/toybox-static/LGPL-2.1")
@@ -249,6 +250,70 @@ class RejectionTest(unittest.TestCase):
 
     def test_reject_unadmitted_atoms_in_the_package_license(self):
         self.reject(self.htop_args(license="GPL-2.0-only AND GPL-3.0-only"), "GPL-3.0-only")
+
+
+class GoRejectionTest(unittest.TestCase):
+    """A pure Go binary (dictamen 2.10 (a)): Apache text, Go's licence, each module's, NOTICE."""
+
+    MODULE = "github.com/zitadel/oidc/v3"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = self.tmp.name
+        self.tree = make_payload_tree(os.path.join(self.root, "tree"))
+        self.out = os.path.join(self.root, "out")
+        base = "share/licenses/incus/"
+        self.files = {
+            base + "COPYING": "Apache-2.0 text\n",
+            base + "go-LICENSE": "Go BSD text\n",
+            base + "go/%s@v3.51.16/LICENSE" % self.MODULE: "Apache-2.0 text\n",
+            base + "go/%s@v3.51.16/NOTICE" % self.MODULE: "Copyright 2020 CAOS AG\n",
+            base + "NOTICE": "==== oidc ====\nCopyright 2020 CAOS AG\n",
+        }
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def args(self, drop=(), bundled=None, **overrides):
+        specs = []
+        for index, (dest, text) in enumerate(sorted(self.files.items())):
+            if dest in drop:
+                continue
+            specs.append("%s=%s" % (make_licence(self.root, "f%d" % index, text), dest))
+        values = dict(name="incus", version="7.6.0", license="Apache-2.0",
+                      linkage="static Go 1.26.9, no libc", license_files=specs,
+                      bundled=bundled if bundled is not None else [
+                          "go 1.26.9 BSD-3-Clause", self.MODULE + " v3.51.16 Apache-2.0"])
+        values.update(overrides)
+        return base_args(self.root, self.tree, self.out, **values)
+
+    def reject(self, argv, needle):
+        rc, _, err = run_cli(argv)
+        self.assertNotEqual(rc, 0, "expected a rejection, got rc=0")
+        self.assertIn(needle, err)
+
+    def test_a_complete_go_package_is_accepted(self):
+        rc, _, err = run_cli(self.args())
+        self.assertEqual(rc, 0, err)
+
+    def test_reject_apache_package_without_its_licence_text(self):
+        self.reject(self.args(drop={"share/licenses/incus/COPYING"}), "share/licenses/incus/COPYING")
+
+    def test_reject_go_linkage_without_go_licence(self):
+        self.reject(self.args(drop={"share/licenses/incus/go-LICENSE"}), "go-LICENSE")
+
+    def test_reject_go_linkage_whose_bundled_omits_go(self):
+        self.reject(self.args(bundled=[self.MODULE + " v3.51.16 Apache-2.0"]), "go")
+
+    def test_reject_a_module_without_its_licence_directory(self):
+        drop = {d for d in self.files if "/go/" in d}
+        self.reject(self.args(drop=drop | {"share/licenses/incus/NOTICE"}),
+                    "share/licenses/incus/go/%s@v3.51.16/" % self.MODULE)
+
+    def test_reject_a_module_notice_missing_from_the_aggregated_notice(self):
+        self.files["share/licenses/incus/NOTICE"] = "something else\n"
+        self.reject(self.args(), "NOTICE")
+        self.reject(self.args(drop={"share/licenses/incus/NOTICE"}), "NOTICE")
 
 
 if __name__ == "__main__":
