@@ -66,6 +66,8 @@ check ncurses ncurses "$NCURSES_VERSION" "github.com/ThomasDickey/ncurses-snapsh
 check linux-headers linux-headers "${LINUX_HEADERS_TAG#v}" "github.com/sabotage-linux/kernel-headers@$LINUX_HEADERS_COMMIT" copyleft
 check htop htop "$HTOP_VERSION" "github.com/htop-dev/htop@$HTOP_COMMIT" copyleft
 check incus incus "$INCUS_VERSION" "github.com/lxc/incus@$INCUS_COMMIT" marked
+check incusd incusd "$INCUS_VERSION" "github.com/lxc/incus@$INCUS_COMMIT" copyleft
+check libudev-zero libudev-zero "$LIBUDEV_ZERO_TAG" "github.com/illiliti/libudev-zero@$LIBUDEV_ZERO_COMMIT"
 check libuv libuv "${LIBUV_TAG#v}" "github.com/libuv/libuv@$LIBUV_COMMIT"
 check sqlite sqlite "${SQLITE_TAG#version-}" "github.com/sqlite/sqlite@$SQLITE_COMMIT"
 check raft raft "${RAFT_TAG#v}" "github.com/cowsql/raft@$RAFT_COMMIT" copyleft

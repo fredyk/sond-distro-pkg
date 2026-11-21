@@ -1,0 +1,74 @@
+# Modified by the Sond project, 2026-11-21
+# Builds the incusd package (the incus daemon: cgo, linked statically against musl and the
+# Sond packages of liblxc, libseccomp, libacl, libcap, cowsql, raft, libuv, SQLite and
+# libudev-zero) from
+# this fork's sond branch with the pinned Go toolchain and publishes it to dist.sond.dev, its
+# corresponding source first. Lives in the fork as .github/workflows/sond-package-incusd.yml.
+# Generated from fredyk/sond-distro-pkg ci/forks.
+name: sond package incusd
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.26.9
+          cache: false
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: incusd
+          version: 7.6.0-sond1
+          license: Apache-2.0 AND LGPL-2.1-or-later
+          upstream: github.com/lxc/incus@8f5e6c2235f6424ec59d3dc06f12e344a4a416e2
+          linkage: static Go 1.26.9 + musl 1.2.5 (MIT), cgo
+          license-files: |
+            COPYING
+          depends: |
+            linux-headers 6.12.77
+            libuv 1.53.0
+            sqlite 3.54.1
+            raft 0.22.1
+            cowsql 1.15.9
+            attr 2.6.0
+            acl 2.4.0
+            libcap 1.2.78
+            libseccomp 2.6.2
+            lxc 7.0.0
+            libudev-zero 1.0.5
+          build: |
+            # The daemon (licence opinion 2.10 (b)). Static: every C library is an archive from
+            # the sysroot, linked by SOND_CC (the link maps say which), in one group because
+            # cgo hands each package's -l flags in an order no static link can rely on. pkg-config
+            # answers with --static (lxc's Libs.private). Tag libsqlite3: go-sqlite3 links the
+            # sqlite package instead of its own amalgamation. No go-lxc static_build tag: it
+            # links libcrypto. -MD and a GOTMPDIR inside the checkout keep the compiler's
+            # dependency files, which say which kernel headers were used.
+            mkdir -p "$SOND_PAYLOAD/bin" .sond-gotmp
+            printf '#!/bin/sh\nexec pkg-config --static "$@"\n' >.sond-gotmp/pkg-config
+            chmod +x .sond-gotmp/pkg-config
+            CGO_ENABLED=1 CC="$SOND_CC" CGO_CFLAGS="$SOND_CFLAGS -MD" \
+              CGO_LDFLAGS="$SOND_LDFLAGS -Wl,--start-group -llxc -lseccomp -lcap -lacl -lattr -lcowsql -lraft -luv -lsqlite3 -ludev -Wl,--end-group" \
+              CGO_LDFLAGS_ALLOW='(-Wl,-wrap,pthread_create)|(-Wl,-z,now)' \
+              PKG_CONFIG="$PWD/.sond-gotmp/pkg-config" GOTMPDIR="$PWD/.sond-gotmp" GOTOOLCHAIN=local \
+              go build -work -trimpath -buildvcs=false -tags libsqlite3 \
+              -ldflags "-s -w -buildid= -linkmode external -extldflags -static" \
+              -o "$SOND_PAYLOAD/bin/incusd" ./cmd/incusd
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}

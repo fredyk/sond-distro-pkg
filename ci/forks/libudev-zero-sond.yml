@@ -1,0 +1,41 @@
+# Builds the libudev-zero package (a static library, no program) from this fork's
+# sond branch against the pinned musl and publishes it to dist.sond.dev.
+# Generated from fredyk/sond-distro-pkg ci/forks.
+name: sond package
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: libudev-zero
+          version: 1.0.5
+          license: ISC
+          upstream: github.com/illiliti/libudev-zero@7a6eee2db11f2eb0f7fd065ae9597fcd270e6734
+          license-files: |
+            LICENSE
+          depends: |
+            linux-headers 6.12.77
+          build: |
+            # libudev.a only: no libudev.so. It reads sysfs and the kernel's netlink uevents
+            # itself, with no udevd.
+            make CC="$SOND_CC" CFLAGS="$SOND_CFLAGS -MD" PREFIX=/ libudev.a libudev.pc
+            make PREFIX=/ DESTDIR="$SOND_PAYLOAD" install-static
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}

@@ -15,7 +15,7 @@ action=${SOND_BUILD_ACTION:?set SOND_BUILD_ACTION to a sond-build-action checkou
 work=${SOND_CI_WORK:-$(mktemp -d)}
 mkdir -p "$work"
 forks=("$@")
-[ ${#forks[@]} -gt 0 ] || forks=(toybox mksh musl ncurses linux-headers htop incus libuv sqlite raft cowsql attr libcap acl libseccomp lxc)
+[ ${#forks[@]} -gt 0 ] || forks=(toybox mksh musl ncurses linux-headers htop incus libuv sqlite raft cowsql attr libcap acl libseccomp lxc libudev-zero incusd)
 
 fails=0
 ok() { printf 'ok   %s\n' "$1"; }
@@ -45,9 +45,9 @@ while n < len(lines) and len(lines[n]) - len(lines[n].lstrip()) == indent and li
 PY
 }
 
-build_fork() { # <fork> <url> <tag> <commit>
-	local fork=$1 url=$2 tag=$3 commit=$4
-	local dir=$work/$fork/src
+build_fork() { # <fork> <url> <tag> <commit> [package: another package built from the same fork]
+	local fork=$1 url=$2 tag=$3 commit=$4 package=${5:-$1}
+	local dir=$work/$package/src
 	local -A in=()
 	[ -d "$dir/.git" ] || git clone -q --branch "$tag" "$url" "$dir"
 	# What CI builds: the fork's sond branch when it exists, else the pinned upstream commit.
@@ -57,11 +57,11 @@ build_fork() { # <fork> <url> <tag> <commit>
 	else
 		git -C "$dir" checkout -q "$commit"
 	fi
-	while IFS= read -r -d '' kv; do in[${kv%%=*}]=${kv#*=}; done < <(inputs_of "$here/forks/$fork-sond.yml")
+	while IFS= read -r -d '' kv; do in[${kv%%=*}]=${kv#*=}; done < <(inputs_of "$here/forks/$package-sond.yml")
 
 	local args=(--fork "$dir" --repository "fredyk/$fork-sond" --name "${in[name]}"
 		--version "${in[version]}" --license "${in[license]}" --upstream "${in[upstream]}"
-		--build "${in[build]}" --out "$work/$fork/out")
+		--build "${in[build]}" --out "$work/$package/out")
 	[ -z "${in[linkage]:-}" ] || args+=(--linkage "${in[linkage]}")
 	while IFS= read -r f; do
 		[ -n "$f" ] && args+=(--license-file "$f")
@@ -70,20 +70,20 @@ build_fork() { # <fork> <url> <tag> <commit>
 		[ -n "$d" ] && args+=(--depends "$d")
 	done <<<"${in[depends]:-}"
 
-	local log=$work/$fork/build.log res
-	if ! res=$(RUNNER_TEMP=$work/$fork/runner SOND_WORK=$work/$fork/runner/sond SOND_DISTRO_PKG=$distro \
+	local log=$work/$package/build.log res
+	if ! res=$(RUNNER_TEMP=$work/$package/runner SOND_WORK=$work/$package/runner/sond SOND_DISTRO_PKG=$distro \
 		bash "$action/build.sh" "${args[@]}" 2>"$log"); then
 		tail -40 "$log"
-		bad "$fork: build.sh succeeds"
+		bad "$package: build.sh succeeds"
 		return
 	fi
-	ok "$fork: build.sh succeeds"
+	ok "$package: build.sh succeeds"
 	local bundle
 	bundle=$(sed -n 's/^bundle=//p' <<<"$res")
-	sed -n 's/^source_bundle=//p' <<<"$res" >"$work/$fork/source_bundle"
+	sed -n 's/^source_bundle=//p' <<<"$res" >"$work/$package/source_bundle"
 	python3 "$distro/sondpkg/bin/sondpkg" verify-bundle "$bundle" >/dev/null &&
-		ok "$fork: bundle verifies" || bad "$fork: bundle verifies"
-	printf '%s\n' "$bundle" >"$work/$fork/bundle"
+		ok "$package: bundle verifies" || bad "$package: bundle verifies"
+	printf '%s\n' "$bundle" >"$work/$package/bundle"
 }
 
 static_bin() { # <fork> <path in payload>
@@ -204,6 +204,40 @@ for fork in "${forks[@]}"; do
 		out=$("$b/payload/bin/incus" --version 2>&1 || true)
 		want=$(sed -n 's/^var Version = "\(.*\)"$/\1/p' "$work/incus/src/internal/version/flex.go")
 		[ -n "$want" ] && [ "$out" = "$want" ] && ok "incus: runs and reports $want" || bad "incus: runs and reports $want (got $out)"
+		;;
+	libudev-zero)
+		# libudev without udevd (ISC): what incusd's device hotplug links on a system with no udev
+		build_fork libudev-zero "$LIBUDEV_ZERO_URL" "$LIBUDEV_ZERO_TAG" "$LIBUDEV_ZERO_COMMIT"
+		[ -f "$work/libudev-zero/bundle" ] || continue
+		b=$(cat "$work/libudev-zero/bundle")
+		for f in lib/libudev.a include/libudev.h lib/pkgconfig/libudev.pc share/licenses/libudev-zero/LICENSE; do has_file libudev-zero "$f"; done
+		[ -z "$(find "$b/payload" -name '*.so*')" ] && ok "libudev-zero: static only" || bad "libudev-zero: static only"
+		grep -q '^ *license *= *"ISC"' "$b/MANIFEST" && ok "libudev-zero: licence ISC" || bad "libudev-zero: licence ISC"
+		[ -z "$(cat "$work/libudev-zero/source_bundle")" ] && ok "libudev-zero: permissive, no source lane" || bad "libudev-zero: permissive, no source lane"
+		;;
+	incusd)
+		# the daemon: cgo, linked statically against the published C libraries (licence opinion 2.10 (b))
+		build_fork incus "$INCUS_URL" "$INCUS_TAG" "$INCUS_COMMIT" incusd
+		[ -f "$work/incusd/bundle" ] || continue
+		static_bin incusd bin/incusd
+		b=$(cat "$work/incusd/bundle")
+		grep -q '^ *license *= *"Apache-2.0 AND LGPL-2.1-or-later"' "$b/MANIFEST" && ok "incusd: licence Apache-2.0 AND LGPL-2.1-or-later" || bad "incusd: licence ($(grep '^ *license' "$b/MANIFEST"))"
+		for f in COPYING go-LICENSE NOTICE musl-COPYRIGHT LGPL-2.1 LGPL-3.0 GPL-3.0 MPL-2.0; do has_file incusd "share/licenses/incusd/$f"; done
+		bundled=$(sed -n '/^ *bundled *=/,/\]/p' "$b/MANIFEST")
+		for e in "lxc 7.0.0 LGPL-2.1-or-later" "libseccomp 2.6.2 LGPL-2.1-only" "acl 2.4.0 LGPL-2.1-or-later" \
+			"libcap 1.2.78 BSD-3-Clause" "cowsql 1.15.9 LGPL-3.0-only WITH LGPL-3.0-linking-exception" \
+			"raft 0.22.1 LGPL-3.0-only WITH LGPL-3.0-linking-exception" "sqlite 3.54.1 blessing" "musl 1.2.5 MIT" \
+			"libudev-zero 1.0.5 ISC" "go 1.26.9 BSD-3-Clause" "github.com/lxc/go-lxc"; do
+			grep -qF "\"$e" <<<"$bundled" && ok "incusd: bundled $e" || bad "incusd: bundled $e"
+		done
+		grep -qF '"github.com/mattn/go-sqlite3' <<<"$bundled" && ok "incusd: go-sqlite3 links the sqlite package (tag libsqlite3)" || bad "incusd: go-sqlite3 linked"
+		[ -n "$(find "$b/payload/share/licenses/incusd/linux-headers" -name '*.h' 2>/dev/null)" ] && ok "incusd: the kernel headers without the syscall note carry their notices" || bad "incusd: the kernel headers without the syscall note carry their notices"
+		src=$(cat "$work/incusd/source_bundle")
+		[ -n "$src" ] && python3 "$distro/sondpkg/bin/sondpkg" verify-bundle "$src" >/dev/null &&
+			ok "incusd: the corresponding source bundle verifies" || bad "incusd: the corresponding source bundle verifies"
+		out=$("$b/payload/bin/incusd" --version 2>&1 || true)
+		want=$(sed -n 's/^var Version = "\(.*\)"$/\1/p' "$work/incusd/src/internal/version/flex.go")
+		[ -n "$want" ] && [ "$out" = "$want" ] && ok "incusd: runs and reports $want" || bad "incusd: runs and reports $want (got $out)"
 		;;
 	libuv)
 		build_fork libuv "$LIBUV_URL" "$LIBUV_TAG" "$LIBUV_COMMIT"

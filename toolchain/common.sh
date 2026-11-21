@@ -115,6 +115,11 @@ ATTR_URL=https://github.com/fredyk/attr-sond
 ATTR_UPSTREAM=https://git.savannah.gnu.org/r/attr.git
 ATTR_TAG=v2.6.0
 ATTR_COMMIT=c440855d6b33446edf4b5eb1a2d892281f15a99b
+# libudev-zero 1.0.5 (a lightweight tag): libudev without udevd, for incusd's hotplug.
+LIBUDEV_ZERO_URL=https://github.com/fredyk/libudev-zero-sond
+LIBUDEV_ZERO_UPSTREAM=https://github.com/illiliti/libudev-zero
+LIBUDEV_ZERO_TAG=1.0.5
+LIBUDEV_ZERO_COMMIT=7a6eee2db11f2eb0f7fd065ae9597fcd270e6734
 LIBCAP_URL=https://github.com/fredyk/libcap-sond
 LIBCAP_UPSTREAM=https://git.kernel.org/pub/scm/libs/libcap/libcap.git
 LIBCAP_TAG=v1.2.78
