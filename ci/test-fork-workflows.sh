@@ -27,6 +27,11 @@ def check(cond, what):
     global fails
     print(("ok   " if cond else "FAIL ") + f"{name}: {what}")
     fails += 0 if cond else 1
+# Under jobs: every line is indented; one at column 0 ends the block scalar it sits in and the
+# rest of the build command is silently lost.
+body = text.split("\njobs:\n", 1)[1] if "\njobs:\n" in text else ""
+check(body and all(not l or l[0] == " " for l in body.split("\n")),
+      "every line under jobs: is indented")
 check(re.search(r"^on:\n(  .*\n)*  push:\n    branches: \[sond\]\n", text, re.M) is not None, "runs on a push to sond")
 check(re.search(r"^  workflow_dispatch:", text, re.M) is not None, "can be run by hand")
 check(re.search(r"^permissions:\n  contents: read\n", text, re.M) is not None, "the token can only read")

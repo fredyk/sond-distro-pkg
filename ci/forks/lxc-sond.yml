@@ -35,8 +35,9 @@ jobs:
             linux-headers 6.12.77
           build: |
             # liblxc.a only (licence opinion, incusd table): no tools or commands (the lxc-* programs, some
-            # GPL-2.0-only), no openssl (no libcrypto), apparmor, selinux, dbus or pam.
-            CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS" meson setup build --prefix=/ \
+            # GPL-2.0-only), no openssl (no libcrypto), apparmor, selinux, dbus or pam. -static: meson's
+            # sanity check runs the program it links, and musl's dynamic loader is not installed.
+            CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" meson setup build --prefix=/ \
               -Dopenssl=false -Dapparmor=false -Dselinux=false -Ddbus=false -Dpam-cgroup=false \
               -Dtools=false -Dcommands=false -Dexamples=false -Dman=false -Dtests=false \
               -Dio-uring-event-loop=false -Dlandlock-monitor=false -Dinit-script=[] \

@@ -36,13 +36,13 @@ jobs:
           build: |
             # libacl only: the GPL-2.0 tools (getfacl, setfacl, chacl) are not built (licence opinion,
             # incusd table). libacl reads extended attributes through the C library;
-# from attr it takes only the error_context.h header.
+            # from attr it takes only the error_context.h header.
             ./autogen.sh
             ./configure --prefix=/ --disable-shared --enable-static --disable-nls \
               CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static"
             make -j"$(nproc)" libacl.la
             make DESTDIR="$SOND_PAYLOAD" install-libLTLIBRARIES install-pkgconfDATA \
-              install-pkgincludeHEADERS install-sysincludeHEADERS
+              install-data-local
             rm -f "$SOND_PAYLOAD"/lib/*.la
       - uses: fredyk/sond-publish-action@v1
         with:
