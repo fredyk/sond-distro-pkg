@@ -5,7 +5,7 @@
 #
 # The tree is a fresh copy of the commit pinned in common.sh, taken from the
 # fork clone build-forks.sh made (never a working tree that may hold other
-# files), and musl is configured with --prefix=$PREFIX and --disable-shared.
+# files); musl is configured with --prefix=$PREFIX, --disable-shared and --enable-wrapper=gcc (auto mode may skip musl-gcc).
 # The result is proven before the script exits: musl-gcc must exist, a hello.c
 # compiled with it must be statically linked, and the binary must run on this
 # host.
@@ -25,8 +25,8 @@ rm -rf -- "$SRC"
 mkdir -p "$SRC"
 git -C "$FORK" archive "$MUSL_COMMIT" | tar -x -C "$SRC"
 
-printf 'configuring musl with --prefix=%s --disable-shared\n' "$PREFIX"
-(cd "$SRC" && ./configure --prefix="$PREFIX" --disable-shared)
+printf 'configuring musl with --prefix=%s --disable-shared --enable-wrapper=gcc\n' "$PREFIX"
+(cd "$SRC" && ./configure --prefix="$PREFIX" --disable-shared --enable-wrapper=gcc)
 
 printf 'building musl with -j%s\n' "$JOBS"
 make -C "$SRC" -j"$JOBS"
