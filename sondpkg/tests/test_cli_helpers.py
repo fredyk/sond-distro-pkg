@@ -33,3 +33,16 @@ class NeedsSourceTest(unittest.TestCase):
 
     def test_a_malformed_expression_is_an_error_not_a_no(self):
         self.assertEqual(run_cli(["needs-source", "MIT AND"])[0], 2)
+
+
+class LinuxHeaderNoticesTest(unittest.TestCase):
+    def test_prints_the_used_headers_whose_notice_must_ship(self):
+        with tempfile.TemporaryDirectory() as include:
+            os.makedirs(os.path.join(include, "linux"))
+            with open(os.path.join(include, "linux", "a.h"), "w") as h:
+                h.write("/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */\n")
+            with open(os.path.join(include, "linux", "b.h"), "w") as h:
+                h.write("/* SPDX-License-Identifier: MIT */\n")
+            rc, out, err = run_cli(["linux-header-notices", "--include", include, "linux/a.h", "linux/b.h"])
+            self.assertEqual(rc, 0, err)
+            self.assertEqual(out, "linux/b.h\n")

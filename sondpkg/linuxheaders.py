@@ -183,6 +183,39 @@ def _terms(node):
     return terms
 
 
+def _has_note(node):
+    if node[0] == "atom":
+        return node[2] == NOTE
+    return any(_has_note(child) for child in node[1])
+
+
+def _tag_of(path, relative):
+    with open(path, "rb") as handle:
+        match = _TAG.search(handle.read())
+    if match is None:
+        kind = UNLABELLED.get(relative)
+        if kind is None:
+            raise PackagerError(
+                "header %s has no SPDX tag and is not in the reviewed table" % relative
+            )
+        return None, kind
+    return _parse(match.group(1).decode("ascii", "replace")), None
+
+
+def notices_needed(include, used):
+    """Of the headers ``used`` (paths relative to ``include``), those whose notice the binary
+    must carry: no branch WITH Linux-syscall-note and not under the kernel COPYING (rule 10)."""
+    needed = []
+    for relative in sorted(set(used)):
+        tree, kind = _tag_of(os.path.join(include, *relative.split("/")), relative)
+        if tree is None:
+            if kind == "permissive":
+                needed.append(relative)
+        elif not _has_note(tree):
+            needed.append(relative)
+    return needed
+
+
 def computed_license(include):
     """The SPDX expression the opinion's choices give for every header under ``include``."""
     terms = set()
@@ -190,18 +223,12 @@ def computed_license(include):
         for filename in files:
             path = os.path.join(directory, filename)
             relative = os.path.relpath(path, include).replace(os.sep, "/")
-            with open(path, "rb") as handle:
-                match = _TAG.search(handle.read())
-            if match is None:
-                kind = UNLABELLED.get(relative)
-                if kind is None:
-                    raise PackagerError(
-                        "header %s has no SPDX tag and is not in the reviewed table" % relative
-                    )
+            tree, kind = _tag_of(path, relative)
+            if tree is None:
                 if kind == "copying":
                     terms.add("GPL-2.0-only WITH " + NOTE)
                 continue
-            terms |= _terms(_parse(match.group(1).decode("ascii", "replace")))
+            terms |= _terms(tree)
     ordered = [t for t in _ORDER if t in terms] + sorted(terms - set(_ORDER))
     expression = " AND ".join(ordered)
     spdx.check_license(expression)

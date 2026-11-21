@@ -101,5 +101,35 @@ class ComputedLicenceTest(unittest.TestCase):
         self.assertIn("LICENSES/preferred/BSD-3-Clause", str(ctx.exception))
 
 
+class NoticeTest(unittest.TestCase):
+    """Rule 10: a binary that includes a permissive-only kernel header carries its notice."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.include = self.tmp.name
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def put(self, relative, data):
+        write_bytes(os.path.join(self.include, *relative.split("/")), data)
+
+    def test_which_used_headers_need_their_notice(self):
+        self.put("linux/capability.h", header("GPL-2.0 WITH Linux-syscall-note"))
+        self.put("linux/either.h", header("(GPL-2.0 WITH Linux-syscall-note) OR BSD-3-Clause"))
+        self.put("linux/bsd.h", header("BSD-3-Clause"))
+        self.put("linux/quota.h", b"/* Redistribution and use ... */\n")  # untagged, permissive
+        self.put("asm/types.h", b"#include <asm-generic/int-ll64.h>\n")  # untagged, COPYING
+        used = ["linux/capability.h", "linux/either.h", "linux/bsd.h", "linux/quota.h", "asm/types.h"]
+        self.assertEqual(
+            linuxheaders.notices_needed(self.include, used), ["linux/bsd.h", "linux/quota.h"]
+        )
+
+    def test_an_untagged_header_outside_the_table_is_refused(self):
+        self.put("linux/new.h", b"#define Z 3\n")
+        with self.assertRaises(PackagerError):
+            linuxheaders.notices_needed(self.include, ["linux/new.h"])
+
+
 if __name__ == "__main__":
     unittest.main()

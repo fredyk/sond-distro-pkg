@@ -88,6 +88,14 @@ def _cmd_object_id(args):
     return 0
 
 
+def _cmd_linux_header_notices(args):
+    from sondpkg import linuxheaders
+
+    for relative in linuxheaders.notices_needed(args.include, args.header):
+        print(relative)
+    return 0
+
+
 def _cmd_needs_source(args):
     """Exit 0 when the licence or a bundled component obliges the source lane, 1 when not,
     2 when an expression is malformed (an error is never a quiet no)."""
@@ -228,6 +236,15 @@ def build_parser():
     child.add_argument("license")
     child.add_argument("--bundled", action="append", default=[], help='"name version SPDX-expression"')
     child.set_defaults(func=_cmd_needs_source)
+
+    child = subparsers.add_parser(
+        "linux-header-notices",
+        help="of the linux-headers headers a binary used, print those whose notice it must carry "
+        "(no Linux-syscall-note branch and not under the kernel COPYING)",
+    )
+    child.add_argument("--include", required=True, help="the include directory the headers are in")
+    child.add_argument("header", nargs="*", help="paths relative to --include")
+    child.set_defaults(func=_cmd_linux_header_notices)
 
     return parser
 

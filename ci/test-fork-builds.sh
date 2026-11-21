@@ -165,6 +165,9 @@ for fork in "${forks[@]}"; do
 		static_bin htop bin/htop
 		b=$(cat "$work/htop/bundle")
 		for f in COPYING ncurses-COPYING musl-COPYRIGHT; do has_file htop "share/licenses/htop/$f"; done
+		# the opinion read the kernel headers htop uses: all under the syscall note or the COPYING
+		[ ! -e "$b/payload/share/licenses/htop/linux-headers" ] && ok "htop: carries no kernel header notice" ||
+			bad "htop: carries no kernel header notice ($(ls "$b/payload/share/licenses/htop/linux-headers"))"
 		# dictamen 3.1 rule 5: exactly ncurses and musl are linked in
 		[ "$(sed -n '/^ *bundled *=/,/\]/p' "$b/MANIFEST" | grep -oE '"[a-z0-9.+_-]+ ' | tr -d '" ' | sort | tr '\n' ' ')" = "musl ncurses " ] &&
 			ok "htop: bundled is exactly ncurses and musl" || bad "htop: bundled is exactly ncurses and musl ($(grep -A4 bundled "$b/MANIFEST"))"
