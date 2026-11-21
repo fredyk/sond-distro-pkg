@@ -107,6 +107,31 @@ COWSQL_UPSTREAM=https://github.com/cowsql/cowsql
 COWSQL_TAG=v1.15.9
 COWSQL_COMMIT=783815b901470e27b7dfbcce3a67c888dad19e78
 
+# attr v2.6.0, libcap v1.2.78, acl v2.4.0, libseccomp v2.6.2 and lxc v7.0.0 are annotated tags; their commits
+# are pinned. The rest of what incusd links: libcap's BSD-3-Clause branch is the one elected
+# (licence opinion, incusd table); libacl
+# includes attr's error_context.h; lxc is built without openssl, so no libcrypto is linked.
+ATTR_URL=https://github.com/fredyk/attr-sond
+ATTR_UPSTREAM=https://git.savannah.gnu.org/r/attr.git
+ATTR_TAG=v2.6.0
+ATTR_COMMIT=c440855d6b33446edf4b5eb1a2d892281f15a99b
+LIBCAP_URL=https://github.com/fredyk/libcap-sond
+LIBCAP_UPSTREAM=https://git.kernel.org/pub/scm/libs/libcap/libcap.git
+LIBCAP_TAG=v1.2.78
+LIBCAP_COMMIT=a1fef85d27d0ee12729a64d1c9b2183c6007e56a
+ACL_URL=https://github.com/fredyk/acl-sond
+ACL_UPSTREAM=https://git.savannah.gnu.org/r/acl.git
+ACL_TAG=v2.4.0
+ACL_COMMIT=3589787cd589b34bdd9265936e17190b6d3f17d1
+LIBSECCOMP_URL=https://github.com/fredyk/libseccomp-sond
+LIBSECCOMP_UPSTREAM=https://github.com/seccomp/libseccomp
+LIBSECCOMP_TAG=v2.6.2
+LIBSECCOMP_COMMIT=72d90906ebcc6a2706868d58404e10a3086ed142
+LXC_URL=https://github.com/fredyk/lxc-sond
+LXC_UPSTREAM=https://github.com/lxc/lxc
+LXC_TAG=v7.0.0
+LXC_COMMIT=e4415af07e3ec291205bc828e2b4e8141f91a499
+
 # ---------------------------------------------------------------------------
 # Reproducibility (RFC-0018): two clean builds, same bytes.
 # ---------------------------------------------------------------------------

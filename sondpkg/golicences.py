@@ -75,8 +75,12 @@ def reviewed(package, module, version):
     return REVIEWED.get((package, module, version)) or REVIEWED.get((None, module, version))
 
 
-def parse_build_info(text):
-    """``(go_version, [(module, version), ...])`` from ``go version -m`` output."""
+def parse_build_info(text, cgo=False):
+    """``(go_version, [(module, version), ...])`` from ``go version -m`` output.
+
+    ``cgo``: the caller accounts for the C side (the link maps name the archives linked), so a
+    binary built with CGO_ENABLED=1 is read for its Go side only.
+    """
     lines = text.splitlines()
     first = re.match(r"^\S.*: go(\d+\.\d+(?:\.\d+)?)\s*$", lines[0] if lines else "")
     if not first:
@@ -96,7 +100,7 @@ def parse_build_info(text):
             deps[-1] = (fields[2], fields[3])
         elif kind == "build" and fields[2] == "CGO_ENABLED=0":
             cgo_disabled = True
-    if not cgo_disabled:
+    if not cgo_disabled and not cgo:
         raise PackagerError("the Go binary was not built with CGO_ENABLED=0: C code is linked "
                             "in and this path does not read its licences")
     return first.group(1), deps
@@ -127,7 +131,7 @@ def _write(path, text):
         handle.write(text)
 
 
-def collect(package, build_info, modcache, goroot, out, admitted=None):
+def collect(package, build_info, modcache, goroot, out, admitted=None, cgo=False):
     """Return ``(bundled_lines, [(source_file, destination), ...])`` for pure Go binaries.
 
     ``build_info`` is one ``go version -m`` output file or a list of them, one per binary.
@@ -135,7 +139,7 @@ def collect(package, build_info, modcache, goroot, out, admitted=None):
     infos = [build_info] if isinstance(build_info, str) else list(build_info)
     go_version, deps = None, []
     for info in infos:
-        version, binary_deps = parse_build_info(_read(info))
+        version, binary_deps = parse_build_info(_read(info), cgo=cgo)
         if go_version not in (None, version):
             raise PackagerError("the binaries were built by different Go toolchains (%s, %s)"
                                 % (go_version, version))

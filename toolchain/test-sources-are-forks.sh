@@ -36,6 +36,11 @@ check libuv "$LIBUV_URL" "${LIBUV_UPSTREAM:-}" "$LIBUV_TAG" "$LIBUV_COMMIT"
 check sqlite "$SQLITE_URL" "${SQLITE_UPSTREAM:-}" "$SQLITE_TAG" "$SQLITE_COMMIT"
 check raft "$RAFT_URL" "${RAFT_UPSTREAM:-}" "$RAFT_TAG" "$RAFT_COMMIT"
 check cowsql "$COWSQL_URL" "${COWSQL_UPSTREAM:-}" "$COWSQL_TAG" "$COWSQL_COMMIT"
+check attr "$ATTR_URL" "${ATTR_UPSTREAM:-}" "$ATTR_TAG" "$ATTR_COMMIT"
+check libcap "$LIBCAP_URL" "${LIBCAP_UPSTREAM:-}" "$LIBCAP_TAG" "$LIBCAP_COMMIT"
+check acl "$ACL_URL" "${ACL_UPSTREAM:-}" "$ACL_TAG" "$ACL_COMMIT"
+check libseccomp "$LIBSECCOMP_URL" "${LIBSECCOMP_UPSTREAM:-}" "$LIBSECCOMP_TAG" "$LIBSECCOMP_COMMIT"
+check lxc "$LXC_URL" "${LXC_UPSTREAM:-}" "$LXC_TAG" "$LXC_COMMIT"
 
 if grep -qE 'curl|\.tar\.gz|TARBALL' "$here/build-musl.sh" "$here/common.sh"; then
 	bad "musl is built from its fork, with no tarball download"

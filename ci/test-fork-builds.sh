@@ -15,7 +15,7 @@ action=${SOND_BUILD_ACTION:?set SOND_BUILD_ACTION to a sond-build-action checkou
 work=${SOND_CI_WORK:-$(mktemp -d)}
 mkdir -p "$work"
 forks=("$@")
-[ ${#forks[@]} -gt 0 ] || forks=(toybox mksh musl ncurses linux-headers htop incus libuv sqlite raft cowsql)
+[ ${#forks[@]} -gt 0 ] || forks=(toybox mksh musl ncurses linux-headers htop incus libuv sqlite raft cowsql attr libcap acl libseccomp lxc)
 
 fails=0
 ok() { printf 'ok   %s\n' "$1"; }
@@ -243,6 +243,42 @@ for fork in "${forks[@]}"; do
 		src=$(cat "$work/$fork/source_bundle")
 		[ -n "$src" ] && python3 "$distro/sondpkg/bin/sondpkg" verify-bundle "$src" >/dev/null &&
 			ok "$fork: the corresponding source bundle verifies" || bad "$fork: the corresponding source bundle verifies"
+		;;
+	attr | libcap | acl | libseccomp | lxc)
+		# static libraries for incusd (licence opinion, its table); LGPL ones publish their source first
+		pin=$(tr a-z A-Z <<<"$fork")
+		url=${pin}_URL tag=${pin}_TAG commit=${pin}_COMMIT
+		build_fork "$fork" "${!url}" "${!tag}" "${!commit}"
+		[ -f "$work/$fork/bundle" ] || continue
+		b=$(cat "$work/$fork/bundle")
+		case $fork in
+		attr) files="lib/libattr.a include/attr/error_context.h include/attr/attributes.h include/attr/libattr.h lib/pkgconfig/libattr.pc share/licenses/attr/LGPL-2.1"
+			lic="LGPL-2.1-or-later" ;;
+		libcap) files="lib/libcap.a include/sys/capability.h lib/pkgconfig/libcap.pc share/licenses/libcap/License"
+			lic="BSD-3-Clause" ;;
+		acl) files="lib/libacl.a include/sys/acl.h include/acl/libacl.h lib/pkgconfig/libacl.pc share/licenses/acl/LGPL-2.1"
+			lic="LGPL-2.1-or-later" ;;
+		libseccomp) files="lib/libseccomp.a include/seccomp.h lib/pkgconfig/libseccomp.pc share/licenses/libseccomp/LGPL-2.1"
+			lic="LGPL-2.1-only" ;;
+		lxc) files="lib/liblxc.a include/lxc/lxccontainer.h include/lxc/attach_options.h include/lxc/version.h lib/pkgconfig/lxc.pc share/licenses/lxc/LGPL-2.1"
+			lic="LGPL-2.1-or-later" ;;
+		esac
+		for f in $files; do has_file "$fork" "$f"; done
+		[ -z "$(find "$b/payload" -name '*.so*')" ] && ok "$fork: static only" || bad "$fork: static only"
+		[ -z "$(find "$b/payload/bin" "$b/payload/sbin" "$b/payload/libexec" -type f 2>/dev/null)" ] && ok "$fork: no programs" || bad "$fork: no programs"
+		grep -q "^ *license *= *\"$lic\"" "$b/MANIFEST" && ok "$fork: licence $lic" || bad "$fork: licence $lic ($(grep '^ *license' "$b/MANIFEST"))"
+		! grep -q '^ *bundled' "$b/MANIFEST" && ok "$fork: bundles nothing" || bad "$fork: bundles nothing ($(grep -A4 bundled "$b/MANIFEST"))"
+		if [ "$fork" = lxc ]; then
+			# the licence opinion: no libcrypto in liblxc
+			grep -q 'libssl\|libcrypto' "$b/payload/lib/pkgconfig/lxc.pc" && bad "lxc: links no openssl" || ok "lxc: links no openssl"
+		fi
+		src=$(cat "$work/$fork/source_bundle")
+		if [ "$lic" = BSD-3-Clause ]; then
+			[ -z "$src" ] && ok "$fork: the BSD-3-Clause branch needs no source lane" || bad "$fork: the BSD-3-Clause branch needs no source lane"
+		else
+			[ -n "$src" ] && python3 "$distro/sondpkg/bin/sondpkg" verify-bundle "$src" >/dev/null &&
+				ok "$fork: the corresponding source bundle verifies" || bad "$fork: the corresponding source bundle verifies"
+		fi
 		;;
 	*) bad "unknown fork $fork" ;;
 	esac

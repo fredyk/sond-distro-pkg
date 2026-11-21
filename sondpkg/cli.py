@@ -21,7 +21,7 @@ def _parse_license_files(specs):
 
 def _cmd_go_licences(args):
     bundled, files = golicences.collect(
-        args.name, args.build_info, args.modcache, args.goroot, args.out)
+        args.name, args.build_info, args.modcache, args.goroot, args.out, cgo=args.cgo)
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "bundled.txt"), "w", encoding="utf-8", newline="\n") as out:
         out.writelines(line + "\n" for line in bundled)
@@ -273,6 +273,9 @@ def build_parser():
     child.add_argument("--modcache", required=True, help="GOMODCACHE the binary was built with")
     child.add_argument("--goroot", required=True, help="GOROOT of the toolchain that built it")
     child.add_argument("--out", required=True)
+    child.add_argument("--cgo", action="store_true",
+                       help="the binaries may link C code (CGO_ENABLED=1); the caller reads what C "
+                       "they link from the link maps")
     child.set_defaults(func=_cmd_go_licences)
 
     return parser

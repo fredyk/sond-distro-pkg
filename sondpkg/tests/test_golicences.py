@@ -128,6 +128,17 @@ class BuildInfoTest(unittest.TestCase):
         with self.assertRaisesRegex(PackagerError, "CGO_ENABLED=0"):
             golicences.parse_build_info(BUILD_INFO.replace("CGO_ENABLED=0", "CGO_ENABLED=1"))
 
+    def test_a_cgo_binary_is_read_when_its_c_side_is_accounted_for(self):
+        # cgo: the C libraries it links come from the link maps, not from here; only the Go
+        # side (toolchain and modules) is this reader's.
+        info = BUILD_INFO.replace("CGO_ENABLED=0", "CGO_ENABLED=1")
+        self.assertEqual(golicences.parse_build_info(info, cgo=True),
+                         golicences.parse_build_info(BUILD_INFO))
+
+    def test_the_cgo_flag_does_not_need_cgo(self):
+        self.assertEqual(golicences.parse_build_info(BUILD_INFO, cgo=True),
+                         golicences.parse_build_info(BUILD_INFO))
+
 
 class CollectTest(unittest.TestCase):
     def setUp(self):
@@ -327,6 +338,23 @@ class CliTest(unittest.TestCase):
                 lines = handle.read().splitlines()
             self.assertEqual(len(lines), 2)
             self.assertTrue(all("=share/licenses/incus/" in line for line in lines))
+
+    def test_go_licences_reads_a_cgo_binary_only_with_cgo(self):
+        with tempfile.TemporaryDirectory() as root:
+            info = os.path.join(root, "info")
+            write_bytes(info, ("/x: go1.26.9\n\tdep\tgolang.org/x/sys\tv0.49.0\th1:a=\n"
+                               "\tbuild\tCGO_ENABLED=1\n").encode())
+            write_bytes(os.path.join(root, "mod", "golang.org/x/sys@v0.49.0", "LICENSE"),
+                        BSD3.encode())
+            write_bytes(os.path.join(root, "goroot", "LICENSE"), BSD3.encode())
+            args = ["go-licences", "--name", "incus", "--build-info", info,
+                    "--modcache", os.path.join(root, "mod"),
+                    "--goroot", os.path.join(root, "goroot"), "--out", os.path.join(root, "out")]
+            rc, _, err = run_cli(args)
+            self.assertEqual(rc, 1)
+            self.assertIn("CGO_ENABLED=0", err)
+            rc, _, err = run_cli(args + ["--cgo"])
+            self.assertEqual(rc, 0, err)
 
 
 if __name__ == "__main__":

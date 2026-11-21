@@ -1,0 +1,45 @@
+# Modified by the Sond project, 2026-11-21
+# Builds the attr package (a static library, no program) from this fork's
+# sond branch against the pinned musl and publishes it to dist.sond.dev, its corresponding source first.
+# Generated from fredyk/sond-distro-pkg ci/forks.
+name: sond package
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: attr
+          version: 2.6.0
+          license: LGPL-2.1-or-later
+          upstream: git.savannah.gnu.org/r/attr@c440855d6b33446edf4b5eb1a2d892281f15a99b
+          license-files: |
+            doc/COPYING.LGPL=share/licenses/attr/LGPL-2.1
+            doc/COPYING
+          build: |
+            # libattr only: the GPL-2.0 tools (attr, getfattr, setfattr) are not built.
+            ./autogen.sh
+            ./configure --prefix=/ --disable-shared --enable-static --disable-nls \
+              CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static"
+            make -j"$(nproc)" libattr.la
+            make DESTDIR="$SOND_PAYLOAD" install-libLTLIBRARIES install-pkgconfDATA install-data-local
+            rm -f "$SOND_PAYLOAD"/lib/*.la
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}

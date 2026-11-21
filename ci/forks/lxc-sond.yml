@@ -1,0 +1,58 @@
+# Modified by the Sond project, 2026-11-21
+# Builds the lxc package (a static library, no program) from this fork's
+# sond branch against the pinned musl and publishes it to dist.sond.dev, its corresponding source first.
+# Generated from fredyk/sond-distro-pkg ci/forks.
+name: sond package
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: sudo apt-get install -y -qq --no-install-recommends meson ninja-build
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: lxc
+          version: 7.0.0
+          license: LGPL-2.1-or-later
+          upstream: github.com/lxc/lxc@e4415af07e3ec291205bc828e2b4e8141f91a499
+          license-files: |
+            COPYING=share/licenses/lxc/LGPL-2.1
+          depends: |
+            libcap 1.2.78
+            libseccomp 2.6.2
+            linux-headers 6.12.77
+          build: |
+            # liblxc.a only (licence opinion, incusd table): no tools or commands (the lxc-* programs, some
+            # GPL-2.0-only), no openssl (no libcrypto), apparmor, selinux, dbus or pam.
+            CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS" meson setup build --prefix=/ \
+              -Dopenssl=false -Dapparmor=false -Dselinux=false -Ddbus=false -Dpam-cgroup=false \
+              -Dtools=false -Dcommands=false -Dexamples=false -Dman=false -Dtests=false \
+              -Dio-uring-event-loop=false -Dlandlock-monitor=false -Dinit-script=[] \
+              -Dinstall-init-files=false -Dinstall-state-dirs=false -Dspecfile=false \
+              -Dcapabilities=true -Dseccomp=true
+            ninja -C build src/lxc/liblxc.a
+            # ninja keeps the compiler's dependency files in its own log; the kernel headers used are read from them
+            ninja -C build -t deps >build/ninja-deps.d
+            install -D -m 0644 build/src/lxc/liblxc.a "$SOND_PAYLOAD/lib/liblxc.a"
+            for h in attach_options.h lxccontainer.h version.h; do
+              install -D -m 0644 "build/src/lxc/$h" "$SOND_PAYLOAD/include/lxc/$h"
+            done
+            install -D -m 0644 build/meson-private/lxc.pc "$SOND_PAYLOAD/lib/pkgconfig/lxc.pc"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}

@@ -1,0 +1,44 @@
+# Builds the libcap package (a static library, no program) from this fork's
+# sond branch against the pinned musl and publishes it to dist.sond.dev.
+# Generated from fredyk/sond-distro-pkg ci/forks.
+name: sond package
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: libcap
+          version: 1.2.78
+          license: BSD-3-Clause
+          upstream: git.kernel.org/pub/scm/libs/libcap/libcap@a1fef85d27d0ee12729a64d1c9b2183c6007e56a
+          license-files: |
+            License
+          depends: |
+            linux-headers 6.12.77
+          build: |
+            # License offers BSD-3-Clause or GPL-2.0-only; the licence opinion elects BSD-3-Clause.
+            # Only libcap.a: no psx, no pam_cap, no Go, no programs. _makenames runs on the build
+            # machine (BUILD_CC) to generate cap_names.h.
+            make -C libcap SHARED=no PAM_CAP=no GOLANG=no USE_GPERF=no lib=lib prefix=/ \
+              CC="$SOND_CC" BUILD_CC=gcc COPTS="$SOND_CFLAGS -MD" LDFLAGS="$SOND_LDFLAGS" all
+            make -C libcap SHARED=no PAM_CAP=no GOLANG=no USE_GPERF=no lib=lib prefix=/ \
+              CC="$SOND_CC" BUILD_CC=gcc DESTDIR="$SOND_PAYLOAD" install-static-cap
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}

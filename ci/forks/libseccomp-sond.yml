@@ -1,0 +1,50 @@
+# Modified by the Sond project, 2026-11-21
+# Builds the libseccomp package (a static library, no program) from this fork's
+# sond branch against the pinned musl and publishes it to dist.sond.dev, its corresponding source first.
+# Generated from fredyk/sond-distro-pkg ci/forks.
+name: sond package
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: libseccomp
+          version: 2.6.2
+          license: LGPL-2.1-only
+          upstream: github.com/seccomp/libseccomp@72d90906ebcc6a2706868d58404e10a3086ed142
+          license-files: |
+            LICENSE
+            LICENSE=share/licenses/libseccomp/LGPL-2.1
+          depends: |
+            linux-headers 6.12.77
+          build: |
+            # The library only: no scmp_sys_resolver, no python bindings.
+            ./autogen.sh
+            ./configure --prefix=/ --disable-shared --enable-static --disable-python \
+              CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static"
+            make -j"$(nproc)" -C include
+            make -j"$(nproc)" -C src libseccomp.la
+            make -C src DESTDIR="$SOND_PAYLOAD" install-libLTLIBRARIES
+            make -C include DESTDIR="$SOND_PAYLOAD" install
+            make DESTDIR="$SOND_PAYLOAD" install-pkgconfDATA
+            rm -f "$SOND_PAYLOAD"/lib/*.la
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
