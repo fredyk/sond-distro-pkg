@@ -53,6 +53,22 @@ class RenderTest(unittest.TestCase):
         self.assertFalse(text.endswith("\n\n"))
 
 
+class OptionalFieldsTest(unittest.TestCase):
+    def test_a_manifest_without_bundled_or_source_object_renders_as_before(self):
+        text = render(sample_manifest())
+        self.assertNotIn("bundled", text)
+        self.assertNotIn("source_object", text)
+
+    def test_bundled_and_source_object_render_and_parse_back(self):
+        m = sample_manifest()
+        m.bundled = ["ncurses 6.6 X11-distribute-modifications-variant", "musl 1.2.5 MIT"]
+        m.source_object = "sha256:" + "c" * 64
+        text = render(m)
+        self.assertIn('  bundled  = ["ncurses 6.6 X11-distribute-modifications-variant",', text)
+        self.assertIn('  source_object = "sha256:' + "c" * 64 + '"', text)
+        self.assertEqual(parse(text), [m])
+
+
 class RoundtripTest(unittest.TestCase):
     def test_render_parse_roundtrip(self):
         original = sample_manifest()

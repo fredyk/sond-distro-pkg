@@ -9,7 +9,7 @@ import threading
 import unittest
 
 from sondpkg import canonical, ed25519, logformat
-from sondpkg.tests.helpers import base_args, make_payload_tree, run_cli
+from sondpkg.tests.helpers import base_args, make_licence, make_payload_tree, run_cli
 
 LOG_SEED = bytes.fromhex("4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb")
 PUBLISHER_SEED = bytes.fromhex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")
@@ -270,6 +270,69 @@ class VerifyPublishedTest(RegistryCase):
         rc, out, err = self.verify()
         self.assertEqual(rc, 1)
         self.assertIn("404", err)
+
+
+class SourceLaneTest(RegistryCase):
+    """A bundle naming a source_object is published only after its source is logged."""
+
+    SOURCE_BYTES = b"htop corresponding source\n"
+
+    def setUp(self):
+        super().setUp()
+        source_id = "sha256:" + hashlib.sha256(self.SOURCE_BYTES).hexdigest()
+        tree = make_payload_tree(os.path.join(self.root, "htop-tree"))
+        licences = [
+            make_licence(self.root, "musl-COPYRIGHT", "MIT text\n"),
+            make_licence(self.root, "COPYING", "GPL-2.0 text\n"),
+            make_licence(self.root, "ncurses-COPYING", "X11 variant text\n"),
+        ]
+        rc, out, err = run_cli(base_args(
+            self.root, tree, os.path.join(self.root, "htop-out"), name="htop", version="3.5.3",
+            license="GPL-2.0-or-later AND GPL-2.0-only", license_files=licences,
+            bundled=["ncurses 6.6 X11-distribute-modifications-variant", "musl 1.2.5 MIT"],
+            source_object=source_id,
+        ))
+        self.assertEqual(rc, 0, err)
+        self.bundle = out.strip()
+        self.stub.routes[("POST", "/publish")] = (
+            201, b"object=sha256:" + b"ab" * 32 + b"\nlog_index=1\ntree_size=2\n",
+        )
+
+    def log_source(self, content_bytes, name="htop-source"):
+        content = "sha256:" + hashlib.sha256(content_bytes).hexdigest()
+        text = logformat.entry_text(
+            name, "3.5.3", content, ed25519.public_key(PUBLISHER_SEED).hex(),
+            "GPL-2.0-or-later AND GPL-2.0-only", "2026-11-21T12:00:00Z",
+        )
+        stored = logformat.sign_entry(PUBLISHER_SEED, text)
+        routes = self.stub.routes
+        routes[("GET", "/log/lookup?name=htop-source&version=3.5.3")] = (200, b"index=0\n" + stored)
+        routes[("GET", "/o/" + content)] = (200, content_bytes)
+        routes[("GET", "/log/latest")] = (200, make_sth(1, logformat.leaf_hash(stored)))
+        routes[("GET", "/log/proof/0?size=1")] = (200, b"")
+        routes[("GET", "/log/key")] = (200, ed25519.public_key(LOG_SEED).hex().encode() + b"\n")
+
+    def posted(self):
+        return [r for r in self.stub.requests if r[0] == "POST"]
+
+    def test_publishes_when_the_source_is_logged_with_that_object(self):
+        self.log_source(self.SOURCE_BYTES)
+        rc, out, err = self.publish()
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(len(self.posted()), 1)
+
+    def test_refuses_when_the_source_is_not_logged(self):
+        rc, out, err = self.publish()
+        self.assertNotEqual(rc, 0)
+        self.assertIn("htop-source", err)
+        self.assertEqual(self.posted(), [])
+
+    def test_refuses_when_the_logged_source_is_another_object(self):
+        self.log_source(b"some other tarball\n")
+        rc, out, err = self.publish()
+        self.assertNotEqual(rc, 0)
+        self.assertIn("source_object", err)
+        self.assertEqual(self.posted(), [])
 
 
 class FetchTest(VerifyPublishedTest):

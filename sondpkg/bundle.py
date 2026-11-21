@@ -60,9 +60,12 @@ def build_bundle(
     license_files,
     source_files,
     out,
+    bundled=(),
+    source_object="",
 ):
     """Build ``<out>/<name>-<version>-<H12>/`` and return its path."""
     rules.validate_metadata(name, version, license, source, upstream, linkage, tier)
+    rules.validate_linking(name, license, linkage, list(bundled), source_object or "")
 
     tree = os.path.abspath(tree)
     if not os.path.isdir(tree):
@@ -101,7 +104,7 @@ def build_bundle(
                 os.makedirs(parent, exist_ok=True)
             shutil.copyfile(source_path, target)
 
-        rules.check_payload(name, linkage, payload, license)
+        rules.check_payload(name, linkage, payload, license, list(bundled))
 
         entries = canon.scan(payload)
         digest = canon.hash_tree(payload)
@@ -121,6 +124,8 @@ def build_bundle(
             files=len(entries),
             licences=licences,
             sources=sources,
+            bundled=list(bundled),
+            source_object=source_object or "",
         )
         with open(
             os.path.join(staging, "MANIFEST"),

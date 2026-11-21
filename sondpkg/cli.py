@@ -33,6 +33,8 @@ def _cmd_build_bundle(args):
         license_files=_parse_license_files(args.license_file),
         source_files=args.source_file,
         out=args.out,
+        bundled=args.bundled,
+        source_object=args.source_object or "",
     )
     print(path)
     return 0
@@ -119,6 +121,18 @@ def build_parser():
         default=[],
         metavar="FILE",
         help="source tarball, patch or build recipe, recorded by sha256",
+    )
+    child.add_argument(
+        "--bundled",
+        action="append",
+        default=[],
+        metavar="'NAME VERSION SPDX'",
+        help="a component linked into the payload, with its licence (repeatable)",
+    )
+    child.add_argument(
+        "--source-object",
+        metavar="sha256:HEX",
+        help="the published source bundle of this build (required when copyleft)",
     )
     child.add_argument("--out", required=True)
     child.set_defaults(func=_cmd_build_bundle)

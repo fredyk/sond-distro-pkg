@@ -7,7 +7,9 @@ Log entry (the message a publisher signs; UTF-8, LF, fixed key order):
     version=<version>           [A-Za-z0-9][A-Za-z0-9._+~-]{0,63}
     content=sha256:<64 hex>     the object id of the canonical object
     publisher-key=<64 hex>      the Ed25519 public key
-    license=<SPDX id>           [A-Za-z0-9][A-Za-z0-9.+-]{0,63}
+    license=<SPDX expression>   at most 128 bytes: identifiers [A-Za-z0-9][A-Za-z0-9.+-]* and
+                                the operators AND, OR, WITH, alternating, one space apart,
+                                with balanced parentheses glued to the identifiers
     timestamp=<YYYY-MM-DDTHH:MM:SSZ>
 
 The stored entry is that text plus one line `signature=<128 hex>` (Ed25519 over the text bytes).
@@ -36,7 +38,41 @@ STH_MAGIC = "sond-dist-log-v1"
 
 _NAME = re.compile(r"[a-z0-9][a-z0-9._+-]{0,63}\Z")
 _VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+~-]{0,63}\Z")
-_LICENSE = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+-]{0,63}\Z")
+_LICENSE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+-]*\Z")
+_LICENSE_OPERATORS = ("AND", "OR", "WITH")
+
+
+class _LicenseExpression:
+    """The shape of an SPDX expression, the same rule lib/entry.snd applies in the registry.
+
+    Which identifiers are admitted is not the log's business (sondpkg.spdx decides that).
+    """
+
+    @staticmethod
+    def match(value):
+        if not 0 < len(value) <= 128:
+            return False
+        depth = 0
+        tokens = value.split(" ")
+        for position, token in enumerate(tokens):
+            if position % 2 == 1:
+                if token not in _LICENSE_OPERATORS:
+                    return False
+                continue
+            opened = len(token) - len(token.lstrip("("))
+            core = token.strip("(")
+            closed = len(core) - len(core.rstrip(")"))
+            core = core.rstrip(")")
+            depth += opened
+            if not _LICENSE_ID.match(core):
+                return False
+            depth -= closed
+            if depth < 0:
+                return False
+        return len(tokens) % 2 == 1 and depth == 0
+
+
+_LICENSE = _LicenseExpression()
 _CONTENT = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 _HEX128 = re.compile(r"[0-9a-f]{128}\Z")

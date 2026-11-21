@@ -92,9 +92,32 @@ def _parse_reply(body):
     return object_id, index, size
 
 
+def _source_is_logged(base, manifest):
+    """A bundle that names its corresponding source goes out only after that source.
+
+    The registry must log `<name>-source` at the same version, its object must be exactly
+    `source_object`, and the entry must check out (signature, object hash, inclusion).
+    """
+    source = manifest.name + "-source"
+    try:
+        _, _, logged, _ = _checked(base, source, manifest.version)
+    except PackagerError as error:
+        raise PackagerError(
+            "publish %s %s first: its source is not verifiably logged (%s)"
+            % (source, manifest.version, error)
+        )
+    if logged != manifest.source_object:
+        raise PackagerError(
+            "the logged %s %s is %s, not this bundle's source_object %s"
+            % (source, manifest.version, logged, manifest.source_object)
+        )
+
+
 def publish(bundle_dir, url, token_file, key_file, now=None):
     """Sign and publish a bundle. Returns (exit code, the three stdout lines)."""
     manifest, _ = bundle_module.verify_bundle(bundle_dir)
+    if manifest.source_object:
+        _source_is_logged(_base(url), manifest)
     obj = canonical.canonical_object(bundle_dir)
     object_id = "sha256:" + hashlib.sha256(obj).hexdigest()
     seed = ed25519.read_key_file(key_file)

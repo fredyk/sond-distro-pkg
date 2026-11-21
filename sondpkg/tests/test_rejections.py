@@ -171,6 +171,85 @@ class RejectionTest(unittest.TestCase):
         self.assertEqual(rc, 0, err)
         self.assertTrue(os.path.isdir(out.strip()))
 
+    # --- copyleft and linked components (dictamen section 3 and 3.1) ---
+
+    def htop_args(self, **overrides):
+        musl = make_licence(self.root, "musl-COPYRIGHT", "MIT text\n")
+        copying = make_licence(self.root, "COPYING", "GPL-2.0 text\n")
+        ncurses = make_licence(self.root, "ncurses-COPYING", "X11 variant text\n")
+        values = dict(
+            name="htop",
+            license="GPL-2.0-or-later AND GPL-2.0-only",
+            license_files=[musl, copying, ncurses],
+            bundled=["ncurses 6.6 X11-distribute-modifications-variant", "musl 1.2.5 MIT"],
+            source_object="sha256:" + "c" * 64,
+        )
+        values.update(overrides)
+        return base_args(self.root, self.tree, self.out, **values)
+
+    def test_build_htop_with_every_obligation_succeeds(self):
+        rc, out, err = run_cli(self.htop_args())
+        self.assertEqual(rc, 0, err)
+        with open(os.path.join(out.strip(), "MANIFEST"), encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertIn('"ncurses 6.6 X11-distribute-modifications-variant"', text)
+        self.assertIn('source_object = "sha256:' + "c" * 64 + '"', text)
+
+    def test_reject_copyleft_package_without_a_source_object(self):
+        self.reject(self.htop_args(source_object=None), "source_object")
+
+    def test_reject_a_malformed_source_object(self):
+        self.reject(self.htop_args(source_object="sha256:abc"), "source_object")
+
+    def test_reject_permissive_package_linking_copyleft_without_a_source_object(self):
+        musl = make_licence(self.root, "musl-COPYRIGHT", "MIT text\n")
+        lgpl = make_licence(self.root, "LGPL-2.1", "LGPL text\n")
+        argv = base_args(self.root, self.tree, self.out,
+                         license="Apache-2.0", license_files=[musl, lgpl],
+                         bundled=["lxc 6.0.5 LGPL-2.1-or-later", "musl 1.2.5 MIT"])
+        self.reject(argv, "source_object")
+
+    def test_the_source_bundle_itself_needs_no_source_object(self):
+        copying = make_licence(self.root, "COPYING", "GPL-2.0 text\n")
+        argv = base_args(self.root, self.tree, self.out, name="htop-source",
+                         license="GPL-2.0-or-later AND GPL-2.0-only", linkage="source",
+                         license_files=[copying])
+        rc, _, err = run_cli(argv)
+        self.assertEqual(rc, 0, err)
+
+    def test_reject_gpl_package_without_its_copying(self):
+        musl = make_licence(self.root, "musl-COPYRIGHT", "MIT text\n")
+        ncurses = make_licence(self.root, "ncurses-COPYING", "X11 variant text\n")
+        self.reject(self.htop_args(license_files=[musl, ncurses]), "share/licenses/htop/COPYING")
+
+    def test_reject_linked_ncurses_without_its_copying(self):
+        musl = make_licence(self.root, "musl-COPYRIGHT", "MIT text\n")
+        copying = make_licence(self.root, "COPYING", "GPL-2.0 text\n")
+        self.reject(self.htop_args(license_files=[musl, copying]), "share/licenses/htop/ncurses-COPYING")
+
+    def test_reject_linked_lgpl_without_its_text(self):
+        musl = make_licence(self.root, "musl-COPYRIGHT", "MIT text\n")
+        argv = base_args(self.root, self.tree, self.out,
+                         license="Apache-2.0", license_files=[musl],
+                         bundled=["lxc 6.0.5 LGPL-2.1-or-later", "musl 1.2.5 MIT"],
+                         source_object="sha256:" + "c" * 64)
+        self.reject(argv, "share/licenses/toybox-static/LGPL-2.1")
+
+    def test_reject_malformed_or_unadmitted_bundled_components(self):
+        self.reject(self.htop_args(bundled=["ncurses"]), "bundled")
+        self.reject(self.htop_args(bundled=["ncurses 6.6 SSPL-1.0", "musl 1.2.5 MIT"]), "SSPL-1.0")
+
+    def test_reject_musl_linkage_whose_bundled_omits_musl(self):
+        self.reject(self.htop_args(bundled=["ncurses 6.6 X11-distribute-modifications-variant"]), "musl")
+
+    def test_reject_htop_linking_anything_beyond_ncurses_and_musl(self):
+        argv = self.htop_args(bundled=["ncurses 6.6 X11-distribute-modifications-variant",
+                                       "musl 1.2.5 MIT", "lm-sensors 3.6.0 LGPL-2.1-or-later"])
+        self.reject(argv, "lm-sensors")
+
+    def test_reject_unadmitted_atoms_in_the_package_license(self):
+        self.reject(self.htop_args(license="GPL-2.0-only AND GPL-3.0-only"), "GPL-3.0-only")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -61,6 +61,8 @@ def base_args(tmp, tree, out, **overrides):
         "tree": tree,
         "license_files": [licence, musl],
         "source_files": [],
+        "bundled": [],
+        "source_object": None,
         "out": out,
     }
     values.update(overrides)
@@ -80,6 +82,10 @@ def base_args(tmp, tree, out, **overrides):
         argv.extend(["--license-file", item])
     for item in values["source_files"]:
         argv.extend(["--source-file", item])
+    for item in values["bundled"]:
+        argv.extend(["--bundled", item])
+    if values["source_object"] is not None:
+        argv.extend(["--source-object", values["source_object"]])
     return argv
 
 

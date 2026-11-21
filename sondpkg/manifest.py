@@ -23,7 +23,10 @@ ORDER = (
     "licences",
     "sources",
 )
-ARRAY_FIELDS = ("licences", "sources")
+# Optional, rendered after ORDER only when set, so manifests written before they
+# existed keep their exact bytes (and their published objects).
+OPTIONAL = ("bundled", "source_object")
+ARRAY_FIELDS = ("licences", "sources", "bundled")
 REQUIRED = ORDER
 
 _PACKAGE_RE = re.compile(r'^package\s+"((?:[^"\\]|\\.)*)"\s*\{$')
@@ -47,6 +50,8 @@ class Manifest:
     files: int = 0
     licences: list = field(default_factory=list)
     sources: list = field(default_factory=list)
+    bundled: list = field(default_factory=list)
+    source_object: str = ""
 
 
 def _quote(value):
@@ -86,6 +91,14 @@ def render(manifest):
             lines.extend(_array_lines(key, value))
         elif key == "files":
             lines.append("  %-8s = %d" % (key, int(value)))
+        else:
+            lines.append("  %-8s = %s" % (key, _quote(value)))
+    for key in OPTIONAL:
+        value = getattr(manifest, key)
+        if not value:
+            continue
+        if key in ARRAY_FIELDS:
+            lines.extend(_array_lines(key, value))
         else:
             lines.append("  %-8s = %s" % (key, _quote(value)))
     lines.append("}")
@@ -139,6 +152,8 @@ def _build(raw):
         files=raw["files"],
         licences=list(raw["licences"]),
         sources=list(raw["sources"]),
+        bundled=list(raw.get("bundled", [])),
+        source_object=raw.get("source_object", ""),
     )
 
 

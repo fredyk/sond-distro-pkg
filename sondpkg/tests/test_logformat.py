@@ -65,10 +65,28 @@ class EntryFormat(unittest.TestCase):
             dict(content="md5:" + "a" * 32),
             dict(publisher_key="ab"),
             dict(license="GPL 2"),
+            dict(license="MIT AND"),
+            dict(license="(MIT AND 0BSD"),
+            dict(license="MIT AND 0BSD)"),
+            dict(license="MIT  AND 0BSD"),
+            dict(license="MIT and 0BSD"),
+            dict(license=" MIT"),
+            dict(license="MIT OR " + "A" * 130),
             dict(timestamp="2026-11-21 10:00:00"),
         ):
             with self.assertRaises(PackagerError, msg=str(bad)):
                 make_entry(**bad)
+
+
+    def test_a_licence_may_be_an_spdx_expression(self):
+        for good in (
+            "GPL-2.0-or-later AND GPL-2.0-only",
+            "Apache-2.0 AND (MIT OR BSD-3-Clause)",
+            "GPL-2.0-only WITH Linux-syscall-note",
+            "((MIT))",
+        ):
+            entry = make_entry(license=good)
+            self.assertIn(("license=" + good + "\n").encode(), entry, good)
 
 
 class TreeHead(unittest.TestCase):
