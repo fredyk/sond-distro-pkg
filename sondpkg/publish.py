@@ -19,6 +19,11 @@ newline, mode 0600. Token file: the Bearer token, surrounding whitespace ignored
 
 import datetime
 import hashlib
+import io
+import os
+import shutil
+import tarfile
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -30,11 +35,14 @@ from sondpkg.errors import PackagerError
 EXIT_PUBLISHED = 0
 EXIT_ALREADY_LOGGED = 3
 TIMEOUT_SECONDS = 60
+# The registry sits behind Cloudflare, which refuses urllib's default User-Agent (error 1010).
+USER_AGENT = "sondpkg/1"
 
 
 def _request(method, url, body=None, headers=None):
     """(status, body bytes); a transport failure is a PackagerError, an HTTP error status is not."""
-    request = urllib.request.Request(url, data=body, method=method, headers=headers or {})
+    request = urllib.request.Request(url, data=body, method=method, headers=dict(headers or {}))
+    request.add_header("User-Agent", USER_AGENT)
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
             return response.status, response.read()
@@ -118,18 +126,15 @@ def _get(url, what):
     return body
 
 
-def verify_published(bundle_dir, url, log_key=None):
-    """Check that the bundle is published: entry, object and inclusion in the signed head.
+def _checked(base, name, version, log_key=None):
+    """The logged entry for name/version, its object and its inclusion, all checked.
 
-    Raises PackagerError on the first thing that does not check out. Without `log_key` the log
-    key is read from the registry itself (integrity only); pass it to anchor the check.
+    Returns (index, tree size, object id, object bytes). Raises PackagerError on the first thing
+    that does not check out: the entry's signature, its name and version, the object's hash, the
+    tree head's signature under the log key, the inclusion proof. Without `log_key` the key is
+    read from the registry itself (integrity only).
     """
-    manifest, _ = bundle_module.verify_bundle(bundle_dir)
-    local = canonical.canonical_object(bundle_dir)
-    object_id = "sha256:" + hashlib.sha256(local).hexdigest()
-    base = _base(url)
-
-    query = urllib.parse.urlencode({"name": manifest.name, "version": manifest.version})
+    query = urllib.parse.urlencode({"name": name, "version": version})
     found = _get(base + "/log/lookup?" + query, "lookup")
     head, _, stored = found.partition(b"\n")
     if not head.startswith(b"index=") or not head[6:].isdigit():
@@ -138,15 +143,12 @@ def verify_published(bundle_dir, url, log_key=None):
     if not logformat.verify_entry(stored):
         raise PackagerError("the logged entry does not verify under its publisher key")
     entry = logformat.parse_entry(stored)
-    if (entry["name"], entry["version"]) != (manifest.name, manifest.version):
+    if (entry["name"], entry["version"]) != (name, version):
         raise PackagerError("the logged entry is for another name or version")
-    if entry["content"] != object_id:
-        raise PackagerError(
-            "the logged object %s is not this bundle's %s" % (entry["content"], object_id)
-        )
+    object_id = entry["content"]
 
     served = _get(base + "/o/" + object_id, "object")
-    if hashlib.sha256(served).hexdigest() != object_id[7:] or served != local:
+    if "sha256:" + hashlib.sha256(served).hexdigest() != object_id:
         raise PackagerError("the stored object does not hash to " + object_id)
 
     key = log_key or _get(base + "/log/key", "log key").decode("ascii", "replace").strip()
@@ -167,4 +169,80 @@ def verify_published(bundle_dir, url, log_key=None):
         logformat.leaf_hash(stored), index, sth["size"], proof, bytes.fromhex(sth["root"])
     ):
         raise PackagerError("the inclusion proof does not match the signed root")
-    return index, sth["size"]
+    return index, sth["size"], object_id, served
+
+
+def verify_published(bundle_dir, url, log_key=None):
+    """Check that the bundle is published: entry, object and inclusion in the signed head.
+
+    Raises PackagerError on the first thing that does not check out. Without `log_key` the log
+    key is read from the registry itself (integrity only); pass it to anchor the check.
+    """
+    manifest, _ = bundle_module.verify_bundle(bundle_dir)
+    local = canonical.canonical_object(bundle_dir)
+    object_id = "sha256:" + hashlib.sha256(local).hexdigest()
+    index, size, logged, served = _checked(_base(url), manifest.name, manifest.version, log_key)
+    if logged != object_id:
+        raise PackagerError("the logged object %s is not this bundle's %s" % (logged, object_id))
+    if served != local:
+        raise PackagerError("the stored object does not hash to " + object_id)
+    return index, size
+
+
+def _unpack(obj, into):
+    """Unpack a canonical object (ustar) into the empty directory `into`: regular files and
+    relative symbolic links that stay inside it, nothing else."""
+    with tarfile.open(fileobj=io.BytesIO(obj), mode="r:") as archive:
+        try:
+            archive.extractall(into, filter="data")
+        except tarfile.FilterError as error:
+            raise PackagerError("the object holds an unsafe entry: %s" % error)
+
+
+def _same_link_or_file(source, target):
+    if os.path.islink(source):
+        return os.path.islink(target) and os.readlink(target) == os.readlink(source)
+    if os.path.islink(target) or not os.path.isfile(target):
+        return False
+    with open(source, "rb") as a, open(target, "rb") as b:
+        return a.read() == b.read()
+
+
+def _install(tree, into):
+    """Copy `tree` into `into`. A path already there must hold the same bytes (or the same link):
+    two packages never silently overwrite each other. Checked in full before anything is copied."""
+    plan = []
+    for directory, dirnames, filenames in os.walk(tree):
+        dirnames.sort()
+        for name in sorted(filenames + [d for d in dirnames if os.path.islink(os.path.join(directory, d))]):
+            source = os.path.join(directory, name)
+            target = os.path.join(into, os.path.relpath(source, tree))
+            if os.path.lexists(target):
+                if not _same_link_or_file(source, target):
+                    raise PackagerError("%s is already in %s with other contents" % (os.path.relpath(source, tree), into))
+                continue
+            plan.append((source, target))
+    for source, target in plan:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        if os.path.islink(source):
+            os.symlink(os.readlink(source), target)
+        else:
+            shutil.copy2(source, target)
+
+
+def fetch(name, version, url, log_key, into):
+    """Install the payload of a published package into the sysroot `into`, once its entry, object,
+    bundle and inclusion under the pinned log key all check out. Returns the result lines."""
+    index, size, object_id, served = _checked(_base(url), name, version, log_key)
+    with tempfile.TemporaryDirectory() as scratch:
+        bundle_dir = os.path.join(scratch, "bundle")
+        os.mkdir(bundle_dir)
+        _unpack(served, bundle_dir)
+        manifest, _ = bundle_module.verify_bundle(bundle_dir)
+        if (manifest.name, manifest.version) != (name, version):
+            raise PackagerError("the object's manifest is for another name or version")
+        if canonical.canonical_object(bundle_dir) != served:
+            raise PackagerError("the object is not in canonical form")
+        os.makedirs(into, exist_ok=True)
+        _install(os.path.join(bundle_dir, "payload"), into)
+    return ["object=" + object_id, "log_index=%d" % index, "tree_size=%d" % size]

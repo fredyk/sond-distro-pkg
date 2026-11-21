@@ -75,6 +75,12 @@ def _cmd_verify_published(args):
     return 0
 
 
+def _cmd_fetch(args):
+    for line in publish.fetch(args.name, args.version, args.url, args.log_key, args.into):
+        print(line)
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="sondpkg",
@@ -165,6 +171,18 @@ def build_parser():
         "--log-key", help="the log public key (64 hex digits); default: asked of the registry"
     )
     child.set_defaults(func=_cmd_verify_published)
+
+    child = subparsers.add_parser(
+        "fetch",
+        help="install a published package's payload into a sysroot, once its entry, object and "
+        "inclusion proof check out under the pinned log key; stdout: object=, log_index=, tree_size=",
+    )
+    child.add_argument("name")
+    child.add_argument("version")
+    child.add_argument("--url", required=True)
+    child.add_argument("--log-key", required=True, help="the log public key (64 hex digits)")
+    child.add_argument("--into", required=True, help="the sysroot; created when missing")
+    child.set_defaults(func=_cmd_fetch)
 
     return parser
 

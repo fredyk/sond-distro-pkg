@@ -114,6 +114,10 @@ class KeygenTest(unittest.TestCase):
 
 
 class PublishTest(RegistryCase):
+    def test_the_publish_request_names_the_client(self):
+        self.publish()
+        self.assertRegex(self.stub.requests[0][2].get("User-Agent", ""), r"^sondpkg/\S+")
+
     def test_new_publish_prints_three_lines_and_exits_zero(self):
         self.stub.routes[("POST", "/publish")] = (
             201,
@@ -224,6 +228,13 @@ class VerifyPublishedTest(RegistryCase):
         rc, out, err = self.verify()
         self.assertEqual(rc, 0, err)
 
+    def test_every_request_names_the_client(self):
+        # the registry sits behind Cloudflare, which refuses urllib's default User-Agent (1010)
+        self.verify()
+        self.assertTrue(self.stub.requests)
+        for method, path, headers, body in self.stub.requests:
+            self.assertRegex(headers.get("User-Agent", ""), r"^sondpkg/\S+", path)
+
     def test_a_pinned_log_key_is_used_when_given(self):
         rc, out, err = self.verify("--log-key", ed25519.public_key(LOG_SEED).hex())
         self.assertEqual(rc, 0, err)
@@ -259,3 +270,55 @@ class VerifyPublishedTest(RegistryCase):
         rc, out, err = self.verify()
         self.assertEqual(rc, 1)
         self.assertIn("404", err)
+
+
+class FetchTest(VerifyPublishedTest):
+    """`fetch` installs a published package's payload into a sysroot, only once it checks out."""
+
+    def fetch(self, *extra, key=None):
+        self.sysroot = os.path.join(self.tmp.name, "sysroot")
+        key = ed25519.public_key(LOG_SEED).hex() if key is None else key
+        return run_cli(
+            ["fetch", "toybox-static", "0.8.15", "--url", self.stub.url, "--log-key", key, "--into", self.sysroot]
+            + list(extra)
+        )
+
+    def test_the_payload_lands_in_the_sysroot(self):
+        rc, out, err = self.fetch()
+        self.assertEqual(rc, 0, err)
+        with open(os.path.join(self.sysroot, "bin", "toybox"), "rb") as handle:
+            self.assertEqual(handle.read(), b"toybox-binary\n")
+        self.assertTrue(os.stat(os.path.join(self.sysroot, "bin", "toybox")).st_mode & stat.S_IXUSR)
+        self.assertEqual(os.readlink(os.path.join(self.sysroot, "bin", "ls")), "toybox")
+        licences = os.path.join(self.sysroot, "share", "licenses", "toybox-static")
+        self.assertTrue(os.path.isfile(os.path.join(licences, "LICENSE")))
+        self.assertIn("object=" + self.object_id, out)
+
+    def test_the_log_key_is_required(self):
+        rc, out, err = run_cli(["fetch", "toybox-static", "0.8.15", "--url", self.stub.url, "--into", self.tmp.name + "/s"])
+        self.assertEqual(rc, 2)
+
+    def test_nothing_is_installed_when_a_check_fails(self):
+        for kwargs in ({"obj": self.object_bytes + b"x"}, {"proof": [b"\x00" * 32]},
+                       {"entry": self.entry_for("sha256:" + "22" * 32)}):
+            self.serve(**kwargs)
+            rc, out, err = self.fetch()
+            self.assertEqual(rc, 1, kwargs)
+            self.assertFalse(os.path.exists(os.path.join(self.sysroot, "bin")), kwargs)
+        self.serve()
+        self.assertEqual(self.fetch(key="00" * 32)[0], 1)
+        self.assertFalse(os.path.exists(os.path.join(self.sysroot, "bin")))
+
+    def test_a_different_file_already_in_the_sysroot_is_not_overwritten(self):
+        target = os.path.join(self.tmp.name, "sysroot", "bin", "toybox")
+        os.makedirs(os.path.dirname(target))
+        with open(target, "wb") as handle:
+            handle.write(b"another package's file\n")
+        self.assertEqual(self.fetch()[0], 1)
+        with open(target, "rb") as handle:
+            self.assertEqual(handle.read(), b"another package's file\n")
+
+    def test_fetching_the_same_package_twice_is_harmless(self):
+        self.assertEqual(self.fetch()[0], 0)
+        rc, out, err = self.fetch()
+        self.assertEqual(rc, 0, err)
