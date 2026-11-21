@@ -1,0 +1,46 @@
+# Builds the mksh-static package from this fork's sond branch against the pinned musl and
+# publishes it to dist.sond.dev. Generated from fredyk/sond-distro-pkg ci/forks.
+name: sond package
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: mksh-static
+          version: R59
+          license: MirOS
+          upstream: github.com/MirBSD/mksh@8deec0b465ed59108331b0a112564f2a89156536
+          license-files: |
+            .sond-licenses/LICENCE-MirOS.txt
+            .sond-licenses/UNICODE-NOTICE
+          build: |
+            bash "$SOND_DISTRO_PKG/toolchain/build-mksh.sh" "$PWD" "$RUNNER_TEMP/mksh-build"
+            install -D -m 0755 "$RUNNER_TEMP/mksh-build/tree/mksh" "$SOND_PAYLOAD/bin/mksh"
+            ln -s mksh "$SOND_PAYLOAD/bin/sh"
+            ln -s mksh "$SOND_PAYLOAD/bin/ksh"
+            # mksh has no licence file: the MirOS block of sh.h and the Unicode
+            # notice of expr.c ship verbatim.
+            mkdir -p .sond-licenses
+            sed -n '11,32p' sh.h >.sond-licenses/LICENCE-MirOS.txt
+            sed -n '888,926p' expr.c >.sond-licenses/UNICODE-NOTICE
+            grep -q mirabilos .sond-licenses/LICENCE-MirOS.txt
+            grep -q 'written authorization of the copyright holder' .sond-licenses/UNICODE-NOTICE
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}

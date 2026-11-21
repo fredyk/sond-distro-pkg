@@ -1,0 +1,35 @@
+# Builds the musl package from this fork's sond branch against the pinned musl and
+# publishes it to dist.sond.dev. Generated from fredyk/sond-distro-pkg ci/forks.
+name: sond package
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: musl
+          version: 1.2.5
+          license: MIT
+          upstream: git.musl-libc.org/git/musl@0784374d561435f7c787a555aeab8ede699ed298
+          build: |
+            ./configure --prefix=/ --disable-shared --disable-wrapper CFLAGS="$SOND_CFLAGS"
+            make -j"$(nproc)"
+            make install DESTDIR="$SOND_PAYLOAD"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
