@@ -72,6 +72,9 @@ HTOP_URL=https://github.com/fredyk/htop-sond
 HTOP_UPSTREAM=https://github.com/htop-dev/htop
 HTOP_TAG=3.5.3
 HTOP_COMMIT=20882b8ef8271fb49ea0eb74bbfd484e9b0a11d8
+# The distro version: -r<n> counts Sond rebuilds of the same release (r1: the version string
+# no longer comes from git describe of the sond branch).
+HTOP_VERSION=3.5.3-r1
 
 # ---------------------------------------------------------------------------
 # Reproducibility (RFC-0018): two clean builds, same bytes.

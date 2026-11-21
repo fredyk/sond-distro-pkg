@@ -174,11 +174,12 @@ for fork in "${forks[@]}"; do
 		src=$(cat "$work/htop/source_bundle")
 		[ -n "$src" ] && python3 "$distro/sondpkg/bin/sondpkg" verify-bundle "$src" >/dev/null &&
 			ok "htop: the corresponding source bundle verifies" || bad "htop: the corresponding source bundle verifies"
-		for f in "htop-$HTOP_TAG.tar.gz" musl-1.2.5.tar.gz "ncurses-$NCURSES_VERSION.tar.gz" build-recipe.sh; do
+		for f in "htop-$HTOP_VERSION.tar.gz" musl-1.2.5.tar.gz "ncurses-$NCURSES_VERSION.tar.gz" build-recipe.sh; do
 			[ -f "$src/payload/share/src/htop/$f" ] && ok "htop-source: holds $f" || bad "htop-source: holds $f"
 		done
 		out=$(TERM=xterm-256color "$b/payload/bin/htop" --version 2>&1 || true)
-		case $out in "htop $HTOP_TAG"*) ok "htop: runs" ;; *) bad "htop: runs (got $out)" ;; esac
+		# the release's version, as upstream's tarball reports it: not git describe of the sond branch
+		[ "$(head -n1 <<<"$out")" = "htop $HTOP_TAG" ] && ok "htop: runs and reports $HTOP_TAG" || bad "htop: runs and reports $HTOP_TAG (got $out)"
 		;;
 	*) bad "unknown fork $fork" ;;
 	esac
