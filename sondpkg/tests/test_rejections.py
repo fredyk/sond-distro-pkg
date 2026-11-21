@@ -144,6 +144,33 @@ class RejectionTest(unittest.TestCase):
         self.assertEqual(rc, 0, err)
         self.assertTrue(os.path.isdir(out.strip()))
 
+    def test_reject_x11_variant_without_its_copying(self):
+        musl = make_licence(self.root, "musl-COPYRIGHT", "MIT text\n")
+        argv = base_args(
+            self.root,
+            self.tree,
+            self.out,
+            name="ncurses",
+            license="X11-distribute-modifications-variant",
+            license_files=[musl],
+        )
+        self.reject(argv, "share/licenses/ncurses/COPYING")
+
+    def test_build_ncurses_with_its_copying_succeeds(self):
+        musl = make_licence(self.root, "musl-COPYRIGHT", "MIT text\n")
+        copying = make_licence(self.root, "COPYING", "X11 variant text\n")
+        argv = base_args(
+            self.root,
+            self.tree,
+            self.out,
+            name="ncurses",
+            license="X11-distribute-modifications-variant",
+            license_files=[musl, copying],
+        )
+        rc, out, err = run_cli(argv)
+        self.assertEqual(rc, 0, err)
+        self.assertTrue(os.path.isdir(out.strip()))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -101,7 +101,7 @@ def build_bundle(
                 os.makedirs(parent, exist_ok=True)
             shutil.copyfile(source_path, target)
 
-        rules.check_payload(name, linkage, payload)
+        rules.check_payload(name, linkage, payload, license)
 
         entries = canon.scan(payload)
         digest = canon.hash_tree(payload)

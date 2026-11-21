@@ -15,7 +15,7 @@ action=${SOND_BUILD_ACTION:?set SOND_BUILD_ACTION to a sond-build-action checkou
 work=${SOND_CI_WORK:-$(mktemp -d)}
 mkdir -p "$work"
 forks=("$@")
-[ ${#forks[@]} -gt 0 ] || forks=(toybox mksh musl)
+[ ${#forks[@]} -gt 0 ] || forks=(toybox mksh musl ncurses)
 
 fails=0
 ok() { printf 'ok   %s\n' "$1"; }
@@ -118,6 +118,21 @@ for fork in "${forks[@]}"; do
 		has_file musl lib/libc.a
 		has_file musl lib/crt1.o
 		has_file musl include/stdio.h
+		;;
+	ncurses)
+		build_fork ncurses "$NCURSES_URL" "$NCURSES_TAG" "$NCURSES_COMMIT"
+		[ -f "$work/ncurses/bundle" ] || continue
+		has_file ncurses lib/libncursesw.a
+		has_file ncurses lib/libtinfow.a
+		has_file ncurses include/ncursesw/curses.h
+		has_file ncurses lib/pkgconfig/ncursesw.pc
+		has_file ncurses share/licenses/ncurses/COPYING
+		# A static binary on a host without a terminfo database still knows the
+		# common terminals: they are compiled in as fallbacks.
+		for t in linux xterm-256color screen-256color tmux-256color vt100; do
+			strings "$(cat "$work/ncurses/bundle")/payload/lib/libtinfow.a" | grep -x "$t|.*" >/dev/null &&
+				ok "ncurses: $t is a fallback" || bad "ncurses: $t is a fallback"
+		done
 		;;
 	*) bad "unknown fork $fork" ;;
 	esac

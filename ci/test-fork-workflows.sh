@@ -47,6 +47,7 @@ PY
 check toybox toybox-static "$TOYBOX_TAG" "github.com/landley/toybox@$TOYBOX_COMMIT"
 check mksh mksh-static "${MKSH_TAG#mksh-}" "github.com/MirBSD/mksh@$MKSH_COMMIT"
 check musl musl "${MUSL_TAG#v}" "git.musl-libc.org/git/musl@$MUSL_COMMIT"
+check ncurses ncurses "$NCURSES_VERSION" "github.com/ThomasDickey/ncurses-snapshots@$NCURSES_COMMIT"
 
 if [ "$fails" -eq 0 ]; then
 	printf 'test-fork-workflows: OK\n'

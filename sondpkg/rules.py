@@ -9,7 +9,11 @@ import re
 
 from sondpkg.errors import PackagerError
 
-ALLOWED_LICENSES = ("0BSD", "MirOS", "MIT")
+ALLOWED_LICENSES = ("0BSD", "MirOS", "MIT", "X11-distribute-modifications-variant")
+
+# Licences whose notice must travel verbatim with every copy: the package ships
+# the upstream file that carries it, under share/licenses/<name>/.
+NOTICE_FILES = {"X11-distribute-modifications-variant": "COPYING"}
 ALLOWED_TIERS = ("public",)
 
 _COMMIT_RE = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
@@ -43,9 +47,16 @@ def validate_metadata(name, version, license, source, upstream, linkage, tier):
         )
 
 
-def required_licence_files(name, linkage):
+def required_licence_files(name, linkage, license=None):
     """Return ``[(path_inside_payload, reason), ...]`` for this package."""
     required = []
+    if license in NOTICE_FILES:
+        required.append(
+            (
+                "share/licenses/%s/%s" % (name, NOTICE_FILES[license]),
+                "%s requires its notice in every copy" % license,
+            )
+        )
     if "musl" in (linkage or "").lower():
         required.append(
             (
@@ -70,9 +81,9 @@ def required_licence_files(name, linkage):
     return required
 
 
-def check_payload(name, linkage, payload):
+def check_payload(name, linkage, payload, license=None):
     """Reject ``payload`` if a required licence file is not inside it."""
-    for relative, reason in required_licence_files(name, linkage):
+    for relative, reason in required_licence_files(name, linkage, license):
         path = os.path.join(payload, *relative.split("/"))
         if not os.path.isfile(path):
             raise PackagerError("missing licence file %s: %s" % (relative, reason))

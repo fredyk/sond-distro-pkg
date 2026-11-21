@@ -28,6 +28,7 @@ check() { # <name> <url> <upstream> <tag> <commit>
 check toybox "$TOYBOX_URL" "${TOYBOX_UPSTREAM:-}" "$TOYBOX_TAG" "$TOYBOX_COMMIT"
 check mksh "$MKSH_URL" "${MKSH_UPSTREAM:-}" "$MKSH_TAG" "$MKSH_COMMIT"
 check musl "$MUSL_URL" "${MUSL_UPSTREAM:-}" "$MUSL_TAG" "$MUSL_COMMIT"
+check ncurses "$NCURSES_URL" "${NCURSES_UPSTREAM:-}" "$NCURSES_TAG" "$NCURSES_COMMIT"
 
 if grep -qE 'curl|\.tar\.gz|TARBALL' "$here/build-musl.sh" "$here/common.sh"; then
 	bad "musl is built from its fork, with no tarball download"

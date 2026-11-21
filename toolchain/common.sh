@@ -51,6 +51,14 @@ MUSL_UPSTREAM=https://git.musl-libc.org/git/musl
 MUSL_TAG=v1.2.5
 MUSL_COMMIT=0784374d561435f7c787a555aeab8ede699ed298
 
+# ncurses is released as snapshots; v6_6 is the 6.6 release (an annotated tag,
+# so the pinned commit is the tag's target, not the tag object).
+NCURSES_URL=https://github.com/fredyk/ncurses-sond
+NCURSES_UPSTREAM=https://github.com/ThomasDickey/ncurses-snapshots
+NCURSES_TAG=v6_6
+NCURSES_VERSION=6.6
+NCURSES_COMMIT=0096bd402c4a9c8f39bd7ed266e1b8920327e4d8
+
 # ---------------------------------------------------------------------------
 # Reproducibility (RFC-0018): two clean builds, same bytes.
 # ---------------------------------------------------------------------------
