@@ -1,0 +1,261 @@
+"""Tests for keygen, publish and verify-published, against an in-process stub registry."""
+
+import hashlib
+import http.server
+import os
+import stat
+import tempfile
+import threading
+import unittest
+
+from sondpkg import canonical, ed25519, logformat
+from sondpkg.tests.helpers import base_args, make_payload_tree, run_cli
+
+LOG_SEED = bytes.fromhex("4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb")
+PUBLISHER_SEED = bytes.fromhex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")
+
+
+def make_sth(size, root, seed=LOG_SEED):
+    body = (
+        "sond-dist-log-v1\nsize=%d\nroot=%s\nkey=%s\n" % (size, root.hex(), ed25519.public_key(seed).hex())
+    ).encode("ascii")
+    signature = ed25519.sign(seed, hashlib.sha256(body).digest())
+    return body + b"signature=" + signature.hex().encode("ascii") + b"\n"
+
+
+class Stub:
+    """A registry that answers from a dict of routes: path -> (status, body)."""
+
+    def __init__(self):
+        self.routes = {}
+        self.requests = []
+        stub = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def _answer(self, method):
+                length = int(self.headers.get("Content-Length") or 0)
+                body = self.rfile.read(length) if length else b""
+                stub.requests.append((method, self.path, dict(self.headers), body))
+                status, payload = stub.routes.get((method, self.path), (404, b"not found\n"))
+                self.send_response(status)
+                self.send_header("Content-Length", str(len(payload)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def do_GET(self):
+                self._answer("GET")
+
+            def do_POST(self):
+                self._answer("POST")
+
+        self.server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        self.url = "http://127.0.0.1:%d" % self.server.server_address[1]
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+
+class RegistryCase(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = self.tmp.name
+        tree = make_payload_tree(os.path.join(self.root, "tree"))
+        rc, out, err = run_cli(base_args(self.root, tree, os.path.join(self.root, "out")))
+        self.assertEqual(rc, 0, err)
+        self.bundle = out.strip()
+        self.token_file = os.path.join(self.root, "token")
+        with open(self.token_file, "w") as handle:
+            handle.write("tok-secret\n")
+        self.key_file = os.path.join(self.root, "key")
+        with open(self.key_file, "w") as handle:
+            handle.write(PUBLISHER_SEED.hex() + "\n")
+        self.stub = Stub()
+
+    def tearDown(self):
+        self.stub.close()
+        self.tmp.cleanup()
+
+    def publish(self, *extra):
+        return run_cli(
+            ["publish", self.bundle, "--url", self.stub.url, "--token-file", self.token_file, "--key-file", self.key_file]
+            + list(extra)
+        )
+
+
+class KeygenTest(unittest.TestCase):
+    def test_writes_a_private_key_file_and_prints_the_public_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "k")
+            rc, out, err = run_cli(["keygen", "--out", path])
+            self.assertEqual(rc, 0, err)
+            seed = ed25519.read_key_file(path)
+            self.assertEqual(out, ed25519.public_key(seed).hex() + "\n")
+            self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+
+    def test_never_overwrites(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "k")
+            run_cli(["keygen", "--out", path])
+            with open(path) as handle:
+                before = handle.read()
+            rc, out, err = run_cli(["keygen", "--out", path])
+            self.assertEqual(rc, 1)
+            self.assertEqual(out, "")
+            self.assertIn("overwrite", err)
+            with open(path) as handle:
+                self.assertEqual(handle.read(), before)
+
+
+class PublishTest(RegistryCase):
+    def test_new_publish_prints_three_lines_and_exits_zero(self):
+        self.stub.routes[("POST", "/publish")] = (
+            201,
+            b"object=sha256:" + b"ab" * 32 + b"\nlog_index=4\ntree_size=5\n",
+        )
+        rc, out, err = self.publish()
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(out, "object=sha256:" + "ab" * 32 + "\nlog_index=4\ntree_size=5\n")
+
+    def test_the_request_is_a_signed_entry_for_the_canonical_object(self):
+        self.stub.routes[("POST", "/publish")] = (201, b"object=sha256:00\nlog_index=0\ntree_size=1\n")
+        self.publish()
+        method, path, headers, body = self.stub.requests[0]
+        self.assertEqual(headers["Authorization"], "Bearer tok-secret")
+        head, _, rest = body.partition(b"\n\n")
+        lines = head.split(b"\n")
+        self.assertEqual(lines[0], b"sond-dist-publish-v1")
+        entry_length = int(lines[1].split(b"=")[1])
+        object_length = int(lines[2].split(b"=")[1])
+        entry, obj = rest[:entry_length], rest[entry_length:]
+        self.assertEqual(len(obj), object_length)
+        self.assertEqual(obj, canonical.canonical_object(self.bundle))
+        parsed = logformat.parse_entry(entry)
+        self.assertTrue(logformat.verify_entry(entry))
+        self.assertEqual(parsed["content"], canonical.object_id(self.bundle))
+        self.assertEqual(parsed["name"], "toybox-static")
+        self.assertEqual(parsed["version"], "0.8.15")
+        self.assertEqual(parsed["license"], "0BSD")
+        self.assertEqual(parsed["publisher-key"], ed25519.public_key(PUBLISHER_SEED).hex())
+
+    def test_already_logged_exits_three_with_the_same_lines(self):
+        self.stub.routes[("POST", "/publish")] = (200, b"object=sha256:cd\nlog_index=2\ntree_size=9\n")
+        rc, out, err = self.publish()
+        self.assertEqual(rc, 3)
+        self.assertEqual(out, "object=sha256:cd\nlog_index=2\ntree_size=9\n")
+
+    def test_every_refusal_is_exit_one_with_nothing_on_stdout(self):
+        for status in (400, 401, 403, 409, 502, 500):
+            self.stub.routes[("POST", "/publish")] = (status, b"nope\n")
+            rc, out, err = self.publish()
+            self.assertEqual(rc, 1, status)
+            self.assertEqual(out, "", status)
+            self.assertIn(str(status), err)
+
+    def test_an_unreachable_registry_or_bad_inputs_are_exit_one(self):
+        rc, out, err = run_cli(
+            ["publish", self.bundle, "--url", "http://127.0.0.1:1", "--token-file", self.token_file, "--key-file", self.key_file]
+        )
+        self.assertEqual((rc, out), (1, ""))
+        rc, out, err = self.publish("--token-file", os.path.join(self.root, "missing"))
+        self.assertEqual((rc, out), (1, ""))
+        rc, out, err = self.publish("--key-file", self.token_file)
+        self.assertEqual((rc, out), (1, ""))
+        rc, out, err = run_cli(
+            ["publish", self.root, "--url", self.stub.url, "--token-file", self.token_file, "--key-file", self.key_file]
+        )
+        self.assertEqual((rc, out), (1, ""))
+
+    def test_a_success_status_with_an_unparsable_body_is_a_failure(self):
+        self.stub.routes[("POST", "/publish")] = (201, b"all good\n")
+        rc, out, err = self.publish()
+        self.assertEqual((rc, out), (1, ""))
+
+    def test_a_trailing_slash_on_the_url_is_harmless(self):
+        self.stub.routes[("POST", "/publish")] = (201, b"object=sha256:00\nlog_index=0\ntree_size=1\n")
+        rc, out, err = run_cli(
+            ["publish", self.bundle, "--url", self.stub.url + "/", "--token-file", self.token_file, "--key-file", self.key_file]
+        )
+        self.assertEqual(rc, 0, err)
+
+
+class VerifyPublishedTest(RegistryCase):
+    def setUp(self):
+        super().setUp()
+        self.object_bytes = canonical.canonical_object(self.bundle)
+        self.object_id = canonical.object_id(self.bundle)
+        self.stored = self.entry_for(self.object_id)
+        other = self.entry_for("sha256:" + "11" * 32, "other", "2.0")
+        # a two-entry log: leaf0 = our entry, leaf1 = another one
+        self.leaf0 = logformat.leaf_hash(self.stored)
+        self.leaf1 = logformat.leaf_hash(other)
+        self.root = hashlib.sha256(b"\x01" + self.leaf0 + self.leaf1).digest()
+        self.serve()
+
+    def entry_for(self, content, name="toybox-static", version="0.8.15"):
+        text = logformat.entry_text(
+            name, version, content, ed25519.public_key(PUBLISHER_SEED).hex(), "0BSD", "2026-11-21T12:00:00Z"
+        )
+        return logformat.sign_entry(PUBLISHER_SEED, text)
+
+    def serve(self, entry=None, obj=None, sth=None, proof=None, key=None):
+        entry = self.stored if entry is None else entry
+        obj = self.object_bytes if obj is None else obj
+        sth = make_sth(2, self.root) if sth is None else sth
+        proof = [self.leaf1] if proof is None else proof
+        key = ed25519.public_key(LOG_SEED).hex() if key is None else key
+        routes = self.stub.routes
+        routes[("GET", "/log/lookup?name=toybox-static&version=0.8.15")] = (200, b"index=0\n" + entry)
+        routes[("GET", "/o/" + self.object_id)] = (200, obj)
+        routes[("GET", "/log/latest")] = (200, sth)
+        routes[("GET", "/log/proof/0?size=2")] = (200, "".join(p.hex() + "\n" for p in proof).encode())
+        routes[("GET", "/log/key")] = (200, key.encode() + b"\n")
+
+    def verify(self, *extra):
+        return run_cli(["verify-published", self.bundle, "--url", self.stub.url] + list(extra))
+
+    def test_a_consistent_registry_verifies(self):
+        rc, out, err = self.verify()
+        self.assertEqual(rc, 0, err)
+
+    def test_a_pinned_log_key_is_used_when_given(self):
+        rc, out, err = self.verify("--log-key", ed25519.public_key(LOG_SEED).hex())
+        self.assertEqual(rc, 0, err)
+        rc, out, err = self.verify("--log-key", "00" * 32)
+        self.assertEqual(rc, 1)
+
+    def test_a_wrong_inclusion_proof_fails(self):
+        self.serve(proof=[b"\x00" * 32])
+        self.assertEqual(self.verify()[0], 1)
+        self.serve(proof=[])
+        self.assertEqual(self.verify()[0], 1)
+
+    def test_a_tampered_object_fails(self):
+        self.serve(obj=self.object_bytes + b"x")
+        self.assertEqual(self.verify()[0], 1)
+
+    def test_a_tree_head_signed_by_another_key_fails(self):
+        other = bytes.fromhex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")
+        self.serve(sth=make_sth(2, self.root, other))
+        self.assertEqual(self.verify()[0], 1)
+
+    def test_an_entry_for_a_different_object_fails(self):
+        self.serve(entry=self.entry_for("sha256:" + "22" * 32))
+        self.assertEqual(self.verify()[0], 1)
+
+    def test_a_forged_entry_signature_fails(self):
+        forged = self.stored[:-5] + b"0" * 4 + b"\n"
+        self.serve(entry=forged)
+        self.assertEqual(self.verify()[0], 1)
+
+    def test_a_bundle_that_was_never_logged_fails(self):
+        del self.stub.routes[("GET", "/log/lookup?name=toybox-static&version=0.8.15")]
+        rc, out, err = self.verify()
+        self.assertEqual(rc, 1)
+        self.assertIn("404", err)

@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from sondpkg import bundle, canon, changemarks
+from sondpkg import bundle, canon, changemarks, ed25519, publish
 from sondpkg.errors import PackagerError
 
 
@@ -54,6 +54,24 @@ def _cmd_show(args):
 
 def _cmd_check_change_marks(args):
     changemarks.check_change_marks(args.fork, args.commit)
+    return 0
+
+
+def _cmd_keygen(args):
+    print(ed25519.generate_key_file(args.out))
+    return 0
+
+
+def _cmd_publish(args):
+    code, lines = publish.publish(args.bundle, args.url, args.token_file, args.key_file)
+    for line in lines:
+        print(line)
+    return code
+
+
+def _cmd_verify_published(args):
+    index, size = publish.verify_published(args.bundle, args.url, args.log_key)
+    print("ok: logged at index %d, included in the signed tree of %d" % (index, size), file=sys.stderr)
     return 0
 
 
@@ -118,6 +136,35 @@ def build_parser():
     child.add_argument("fork")
     child.add_argument("commit")
     child.set_defaults(func=_cmd_check_change_marks)
+
+    child = subparsers.add_parser(
+        "keygen", help="write a new Ed25519 private key file and print its public key"
+    )
+    child.add_argument("--out", required=True, help="key file to create (mode 0600, never overwritten)")
+    child.set_defaults(func=_cmd_keygen)
+
+    child = subparsers.add_parser(
+        "publish",
+        help="sign a bundle and publish it; stdout: object=, log_index=, tree_size= "
+        "(exit 0 published, 3 already logged, 1 any other failure)",
+    )
+    child.add_argument("bundle")
+    child.add_argument("--url", required=True, help="registry base URL, e.g. https://dist.sond.dev")
+    child.add_argument("--token-file", required=True, help="file holding the Bearer token")
+    child.add_argument("--key-file", required=True, help="Ed25519 private key file (see keygen)")
+    child.set_defaults(func=_cmd_publish)
+
+    child = subparsers.add_parser(
+        "verify-published",
+        help="exit 0 only if the object hash, the entry signature and the inclusion proof "
+        "against the signed tree head all check out",
+    )
+    child.add_argument("bundle")
+    child.add_argument("--url", required=True)
+    child.add_argument(
+        "--log-key", help="the log public key (64 hex digits); default: asked of the registry"
+    )
+    child.set_defaults(func=_cmd_verify_published)
 
     return parser
 
