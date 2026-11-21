@@ -1,0 +1,42 @@
+# Builds the sqlite package (the static library and a static sqlite3 shell) from this fork's sond
+# branch against the pinned musl and publishes it to dist.sond.dev. Generated
+# from fredyk/sond-distro-pkg ci/forks.
+name: sond package
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: sqlite
+          version: 3.54.1
+          license: blessing
+          upstream: github.com/sqlite/sqlite@57520227c95396ce39ba6ecaac8d475b78dd3964
+          license-files: |
+            LICENSE.md
+          build: |
+            # SQLite is public domain (LICENSE.md, the blessing in every source header). No
+            # readline, no TCL bindings: what is linked in is SQLite and musl.
+            ./configure --prefix=/ --disable-shared --enable-static --disable-tcl \
+              --disable-readline --disable-editline \
+              CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static"
+            make -j"$(nproc)"
+            make install DESTDIR="$SOND_PAYLOAD"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}

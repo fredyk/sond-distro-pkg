@@ -18,6 +18,9 @@ LICENSE_ATOMS = frozenset({
     "GPL-2.0-only", "GPL-2.0-or-later", "Apache-2.0", "LGPL-2.1-or-later",
     # linux-headers (section 2.11): the kernel UAPI headers' LGPL and BSD files
     "LGPL-2.1-only", "BSD-3-Clause",
+    # the C libraries incusd links (section 2.10, its table), each published as a package:
+    # SQLite, libuv (MIT with tree.h and inet.c), cowsql and raft
+    "blessing", "BSD-2-Clause", "ISC", "LGPL-3.0-only",
 })
 # Identifiers a component linked into the package may use.
 BUNDLED_ATOMS = LICENSE_ATOMS | frozenset({

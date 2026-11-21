@@ -15,7 +15,7 @@ action=${SOND_BUILD_ACTION:?set SOND_BUILD_ACTION to a sond-build-action checkou
 work=${SOND_CI_WORK:-$(mktemp -d)}
 mkdir -p "$work"
 forks=("$@")
-[ ${#forks[@]} -gt 0 ] || forks=(toybox mksh musl ncurses linux-headers htop incus)
+[ ${#forks[@]} -gt 0 ] || forks=(toybox mksh musl ncurses linux-headers htop incus libuv sqlite)
 
 fails=0
 ok() { printf 'ok   %s\n' "$1"; }
@@ -204,6 +204,27 @@ for fork in "${forks[@]}"; do
 		out=$("$b/payload/bin/incus" --version 2>&1 || true)
 		want=$(sed -n 's/^var Version = "\(.*\)"$/\1/p' "$work/incus/src/internal/version/flex.go")
 		[ -n "$want" ] && [ "$out" = "$want" ] && ok "incus: runs and reports $want" || bad "incus: runs and reports $want (got $out)"
+		;;
+	libuv)
+		build_fork libuv "$LIBUV_URL" "$LIBUV_TAG" "$LIBUV_COMMIT"
+		[ -f "$work/libuv/bundle" ] || continue
+		b=$(cat "$work/libuv/bundle")
+		for f in lib/libuv.a include/uv.h lib/pkgconfig/libuv.pc \
+			share/licenses/libuv/LICENSE share/licenses/libuv/LICENSE-extra; do has_file libuv "$f"; done
+		[ -z "$(find "$b/payload" -name '*.so*')" ] && ok "libuv: static only" || bad "libuv: static only"
+		# LICENSE-extra: tree.h is BSD-2-Clause and src/inet.c ISC, both compiled in
+		grep -q '^ *license *= *"MIT AND BSD-2-Clause AND ISC"' "$b/MANIFEST" &&
+			ok "libuv: licence MIT AND BSD-2-Clause AND ISC" || bad "libuv: licence MIT AND BSD-2-Clause AND ISC ($(grep '^ *license' "$b/MANIFEST"))"
+		;;
+	sqlite)
+		build_fork sqlite "$SQLITE_URL" "$SQLITE_TAG" "$SQLITE_COMMIT"
+		[ -f "$work/sqlite/bundle" ] || continue
+		b=$(cat "$work/sqlite/bundle")
+		for f in lib/libsqlite3.a include/sqlite3.h lib/pkgconfig/sqlite3.pc share/licenses/sqlite/LICENSE.md; do has_file sqlite "$f"; done
+		[ -z "$(find "$b/payload" -name '*.so*')" ] && ok "sqlite: static only" || bad "sqlite: static only"
+		static_bin sqlite bin/sqlite3
+		out=$("$b/payload/bin/sqlite3" :memory: 'select sqlite_version();' 2>&1 || true)
+		[ "$out" = "${SQLITE_TAG#version-}" ] && ok "sqlite: runs and reports ${SQLITE_TAG#version-}" || bad "sqlite: runs and reports ${SQLITE_TAG#version-} (got $out)"
 		;;
 	*) bad "unknown fork $fork" ;;
 	esac

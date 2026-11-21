@@ -32,6 +32,8 @@ check ncurses "$NCURSES_URL" "${NCURSES_UPSTREAM:-}" "$NCURSES_TAG" "$NCURSES_CO
 check linux-headers "$LINUX_HEADERS_URL" "${LINUX_HEADERS_UPSTREAM:-}" "$LINUX_HEADERS_TAG" "$LINUX_HEADERS_COMMIT"
 check htop "$HTOP_URL" "${HTOP_UPSTREAM:-}" "$HTOP_TAG" "$HTOP_COMMIT"
 check incus "$INCUS_URL" "${INCUS_UPSTREAM:-}" "$INCUS_TAG" "$INCUS_COMMIT"
+check libuv "$LIBUV_URL" "${LIBUV_UPSTREAM:-}" "$LIBUV_TAG" "$LIBUV_COMMIT"
+check sqlite "$SQLITE_URL" "${SQLITE_UPSTREAM:-}" "$SQLITE_TAG" "$SQLITE_COMMIT"
 
 if grep -qE 'curl|\.tar\.gz|TARBALL' "$here/build-musl.sh" "$here/common.sh"; then
 	bad "musl is built from its fork, with no tarball download"

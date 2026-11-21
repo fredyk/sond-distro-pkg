@@ -61,6 +61,8 @@ check ncurses ncurses "$NCURSES_VERSION" "github.com/ThomasDickey/ncurses-snapsh
 check linux-headers linux-headers "${LINUX_HEADERS_TAG#v}" "github.com/sabotage-linux/kernel-headers@$LINUX_HEADERS_COMMIT" copyleft
 check htop htop "$HTOP_VERSION" "github.com/htop-dev/htop@$HTOP_COMMIT" copyleft
 check incus incus "$INCUS_VERSION" "github.com/lxc/incus@$INCUS_COMMIT" marked
+check libuv libuv "${LIBUV_TAG#v}" "github.com/libuv/libuv@$LIBUV_COMMIT"
+check sqlite sqlite "${SQLITE_TAG#version-}" "github.com/sqlite/sqlite@$SQLITE_COMMIT"
 
 if [ "$fails" -eq 0 ]; then
 	printf 'test-fork-workflows: OK\n'

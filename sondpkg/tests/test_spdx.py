@@ -46,6 +46,14 @@ class SpdxTest(unittest.TestCase):
             " AND MIT AND BSD-3-Clause"
         )
 
+    def test_the_c_libraries_incusd_links_are_admitted_as_packages(self):
+        # the licence opinion's incusd table: each library is published as a package of its own,
+        # under the licence it carries when linked
+        for expression in ("blessing", "MIT AND BSD-2-Clause AND ISC",
+                           "LGPL-3.0-only WITH LGPL-3.0-linking-exception",
+                           "LGPL-2.1-only", "LGPL-2.1-or-later", "BSD-3-Clause OR GPL-2.0-only"):
+            spdx.check_license(expression)
+
     def test_bundled_licence_atoms_and_exceptions(self):
         spdx.check_bundled("LGPL-3.0-only WITH LGPL-3.0-linking-exception")
         spdx.check_bundled("BSD-3-Clause OR GPL-2.0-only")

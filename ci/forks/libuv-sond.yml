@@ -1,0 +1,46 @@
+# Builds the libuv package (a static library, no binary) from this fork's sond
+# branch against the pinned musl and publishes it to dist.sond.dev. Generated
+# from fredyk/sond-distro-pkg ci/forks.
+name: sond package
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: libuv
+          version: 1.53.0
+          license: MIT AND BSD-2-Clause AND ISC
+          upstream: github.com/libuv/libuv@840404ce8ba7cc0204be52389a6cfff9f2c90fb6
+          license-files: |
+            LICENSE
+            LICENSE-extra
+          depends: |
+            linux-headers 6.12.77
+          build: |
+            # LICENSE-extra: include/uv/tree.h is BSD-2-Clause and src/inet.c ISC; both are
+            # compiled into libuv.a, so both texts ship with it.
+            sh autogen.sh
+            ./configure --prefix=/ --disable-shared --enable-static \
+              CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static"
+            make -j"$(nproc)"
+            make install DESTDIR="$SOND_PAYLOAD"
+            rm -f "$SOND_PAYLOAD"/lib/*.la
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}

@@ -84,6 +84,18 @@ INCUS_TAG=v7.6.0
 INCUS_COMMIT=8f5e6c2235f6424ec59d3dc06f12e344a4a416e2
 INCUS_VERSION=7.6.0-sond1
 
+# libuv v1.53.0 is an annotated tag; its commit is pinned. A dependency of raft and cowsql (incusd).
+LIBUV_URL=https://github.com/fredyk/libuv-sond
+LIBUV_UPSTREAM=https://github.com/libuv/libuv
+LIBUV_TAG=v1.53.0
+LIBUV_COMMIT=840404ce8ba7cc0204be52389a6cfff9f2c90fb6
+
+# SQLite 3.54.1 from its GitHub mirror; the tag is lightweight. A dependency of cowsql (incusd).
+SQLITE_URL=https://github.com/fredyk/sqlite-sond
+SQLITE_UPSTREAM=https://github.com/sqlite/sqlite
+SQLITE_TAG=version-3.54.1
+SQLITE_COMMIT=57520227c95396ce39ba6ecaac8d475b78dd3964
+
 # ---------------------------------------------------------------------------
 # Reproducibility (RFC-0018): two clean builds, same bytes.
 # ---------------------------------------------------------------------------
