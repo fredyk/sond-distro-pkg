@@ -82,7 +82,7 @@ INCUS_URL=https://github.com/fredyk/incus-sond
 INCUS_UPSTREAM=https://github.com/lxc/incus
 INCUS_TAG=v7.6.0
 INCUS_COMMIT=8f5e6c2235f6424ec59d3dc06f12e344a4a416e2
-INCUS_VERSION=7.6.0-sond1
+INCUS_VERSION=7.6.0-sond2 # -sond2: the sond branch drops -fexceptions (musl does not unwind; it pulled glibc's unwinder)
 
 # libuv v1.53.0 is an annotated tag; its commit is pinned. A dependency of raft and cowsql (incusd).
 LIBUV_URL=https://github.com/fredyk/libuv-sond
@@ -135,7 +135,7 @@ LIBSECCOMP_TAG=v2.6.2
 LIBSECCOMP_COMMIT=72d90906ebcc6a2706868d58404e10a3086ed142
 LXC_URL=https://github.com/fredyk/lxc-sond
 LXC_UPSTREAM=https://github.com/lxc/lxc
-LXC_VERSION=7.0.0-sond1 # -sond1: 7.0.0 went out holding LTO bytecode, which links under one gcc only
+LXC_VERSION=7.0.0-sond2 # -sond1: no LTO (7.0.0 held bytecode for one gcc only); -sond2: only the public API global, no unwinder
 LXC_TAG=v7.0.0
 LXC_COMMIT=e4415af07e3ec291205bc828e2b4e8141f91a499
 

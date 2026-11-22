@@ -24,7 +24,7 @@ jobs:
         uses: fredyk/sond-build-action@v1
         with:
           name: lxc
-          version: 7.0.0-sond1
+          version: 7.0.0-sond2
           license: LGPL-2.1-or-later
           upstream: github.com/lxc/lxc@e4415af07e3ec291205bc828e2b4e8141f91a499
           license-files: |
@@ -38,7 +38,8 @@ jobs:
             # GPL-2.0-only), no openssl (no libcrypto), apparmor, selinux, dbus or pam. -static: meson's
             # sanity check runs the program it links, and musl's dynamic loader is not installed.
             # -Db_lto=false: lxc turns LTO on, and an archive of LTO bytecode links only under the gcc that wrote it.
-            CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" meson setup build --prefix=/ -Db_lto=false \
+            # -fno-exceptions: lxc asks -fexceptions, which pulls libgcc_eh's unwinder (built for glibc).
+            CC="$SOND_CC" CFLAGS="$SOND_CFLAGS -fno-exceptions" LDFLAGS="$SOND_LDFLAGS -static" meson setup build --prefix=/ -Db_lto=false \
               -Dopenssl=false -Dapparmor=false -Dselinux=false -Ddbus=false -Dpam-cgroup=false \
               -Dtools=false -Dcommands=false -Dexamples=false -Dman=false -Dtests=false \
               -Dio-uring-event-loop=false -Dlandlock-monitor=false -Dinit-script=[] \
@@ -47,7 +48,12 @@ jobs:
             ninja -C build src/lxc/liblxc.a
             # ninja keeps the compiler's dependency files in its own log; the kernel headers used are read from them
             ninja -C build -t deps >build/ninja-deps.d
-            install -D -m 0644 build/src/lxc/liblxc.a "$SOND_PAYLOAD/lib/liblxc.a"
+            # One relocatable object with lxc's hidden symbols made local: like liblxc.so, only the
+            # __public API is global, so lxc's internals cannot collide with a program's own.
+            ld -r -o build/liblxc.o --whole-archive build/src/lxc/liblxc.a
+            objcopy --localize-hidden build/liblxc.o
+            mkdir -p "$SOND_PAYLOAD/lib"
+            ar rcsD "$SOND_PAYLOAD/lib/liblxc.a" build/liblxc.o
             for h in attach_options.h lxccontainer.h version.h; do
               install -D -m 0644 "build/src/lxc/$h" "$SOND_PAYLOAD/include/lxc/$h"
             done

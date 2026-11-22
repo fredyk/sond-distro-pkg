@@ -30,7 +30,7 @@ jobs:
         uses: fredyk/sond-build-action@v1
         with:
           name: incusd
-          version: 7.6.0-sond1
+          version: 7.6.0-sond2
           license: Apache-2.0 AND LGPL-2.1-or-later
           upstream: github.com/lxc/incus@8f5e6c2235f6424ec59d3dc06f12e344a4a416e2
           linkage: static Go 1.26.9 + musl 1.2.5 (MIT), cgo
@@ -46,7 +46,7 @@ jobs:
             acl 2.4.0
             libcap 1.2.78
             libseccomp 2.6.2
-            lxc 7.0.0-sond1
+            lxc 7.0.0-sond2
             libudev-zero 1.0.5
           build: |
             # The daemon (licence opinion 2.10 (b)). Static: every C library is an archive from
