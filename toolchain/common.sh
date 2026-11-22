@@ -82,7 +82,7 @@ INCUS_URL=https://github.com/fredyk/incus-sond
 INCUS_UPSTREAM=https://github.com/lxc/incus
 INCUS_TAG=v7.6.0
 INCUS_COMMIT=8f5e6c2235f6424ec59d3dc06f12e344a4a416e2
-INCUS_VERSION=7.6.0-sond3 # -sond2: no -fexceptions (musl does not unwind; it pulled glibc's unwinder); -sond3: incusd compiles with an empty GOCACHE
+INCUS_VERSION=7.6.0-sond4 # -sond2: no -fexceptions (musl does not unwind; it pulled glibc's unwinder); -sond3: incusd compiles with an empty GOCACHE; -sond4: no -MD, SOND_CC records the headers
 
 # libuv v1.53.0 is an annotated tag; its commit is pinned. A dependency of raft and cowsql (incusd).
 LIBUV_URL=https://github.com/fredyk/libuv-sond
