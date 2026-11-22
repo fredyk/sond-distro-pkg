@@ -283,6 +283,12 @@ class ReviewedTest(unittest.TestCase):
         self.assertEqual(entry.spdx, "Apache-2.0")
         self.assertIn("LICENSE.docs", entry.ignore)
 
+    def test_go_lxc_is_lgpl_2_1_only_for_the_daemon(self):
+        entry = golicences.reviewed(
+            "incusd", "github.com/lxc/go-lxc", "v0.0.0-20260316180011-3af4ce000ed7")
+        self.assertEqual(entry.spdx, "LGPL-2.1-only")
+        self.assertEqual(entry.ignore, ())
+
     def test_a_new_version_needs_a_new_review(self):
         self.assertIsNone(
             golicences.reviewed("incus", "github.com/cyphar/filepath-securejoin", "v0.8.0"))

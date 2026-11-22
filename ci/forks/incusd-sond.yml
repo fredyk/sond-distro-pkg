@@ -30,7 +30,7 @@ jobs:
         uses: fredyk/sond-build-action@v1
         with:
           name: incusd
-          version: 7.6.0-sond2
+          version: 7.6.0-sond3
           license: Apache-2.0 AND LGPL-2.1-or-later
           upstream: github.com/lxc/incus@8f5e6c2235f6424ec59d3dc06f12e344a4a416e2
           linkage: static Go 1.26.9 + musl 1.2.5 (MIT), cgo
@@ -55,14 +55,15 @@ jobs:
             # answers with --static (lxc's Libs.private). Tag libsqlite3: go-sqlite3 links the
             # sqlite package instead of its own amalgamation. No go-lxc static_build tag: it
             # links libcrypto. -MD and a GOTMPDIR inside the checkout keep the compiler's
-            # dependency files, which say which kernel headers were used.
+            # dependency files, which say which kernel headers were used; an empty GOCACHE compiles
+            # every package, since a cached one writes no dependency file.
             mkdir -p "$SOND_PAYLOAD/bin" .sond-gotmp
             printf '#!/bin/sh\nexec pkg-config --static "$@"\n' >.sond-gotmp/pkg-config
             chmod +x .sond-gotmp/pkg-config
             CGO_ENABLED=1 CC="$SOND_CC" CGO_CFLAGS="$SOND_CFLAGS -MD" \
               CGO_LDFLAGS="$SOND_LDFLAGS -Wl,--start-group -llxc -lseccomp -lcap -lacl -lattr -lcowsql -lraft -luv -lsqlite3 -ludev -Wl,--end-group" \
               CGO_LDFLAGS_ALLOW='(-Wl,-wrap,pthread_create)|(-Wl,-z,now)' \
-              PKG_CONFIG="$PWD/.sond-gotmp/pkg-config" GOTMPDIR="$PWD/.sond-gotmp" GOTOOLCHAIN=local \
+              PKG_CONFIG="$PWD/.sond-gotmp/pkg-config" GOTMPDIR="$PWD/.sond-gotmp" GOCACHE="$PWD/.sond-gotmp/cache" GOTOOLCHAIN=local \
               go build -work -trimpath -buildvcs=false -tags libsqlite3 \
               -ldflags "-s -w -buildid= -linkmode external -extldflags -static" \
               -o "$SOND_PAYLOAD/bin/incusd" ./cmd/incusd

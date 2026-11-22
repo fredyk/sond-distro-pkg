@@ -27,7 +27,7 @@ jobs:
         uses: fredyk/sond-build-action@v1
         with:
           name: incus
-          version: 7.6.0-sond2
+          version: 7.6.0-sond3
           license: Apache-2.0
           upstream: github.com/lxc/incus@8f5e6c2235f6424ec59d3dc06f12e344a4a416e2
           linkage: static Go, no libc

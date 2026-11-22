@@ -48,6 +48,11 @@ REVIEWED = {
         Reviewed("BSD-3-Clause", (), None,
                  "BSD-3-Clause AND MPL-2.0 by file; the client compiles only doc.go, join*.go, "
                  "vfs.go and internal/consts, all BSD-3-Clause"),
+    ("incusd", "github.com/lxc/go-lxc", "v0.0.0-20260316180011-3af4ce000ed7"):
+        Reviewed("LGPL-2.1-only", (), None,
+                 "LGPLv2.1 (no 'or later') plus an exception for static or dynamic linking without "
+                 "Minimal Corresponding Source; the exception only adds permissions, so the "
+                 "obligations of LGPL-2.1-only cover it (dictamen 2.10 (b))"),
     (None, "github.com/opencontainers/go-digest", "v1.0.0"):
         Reviewed("Apache-2.0", ("LICENSE.docs",), None,
                  "LICENSE.docs (CC-BY-SA-4.0) covers the documentation, not the code"),
