@@ -46,7 +46,7 @@ jobs:
             acl 2.4.0
             libcap 1.2.78
             libseccomp 2.6.2
-            lxc 7.0.0
+            lxc 7.0.0-sond1
             libudev-zero 1.0.5
           build: |
             # The daemon (licence opinion 2.10 (b)). Static: every C library is an archive from

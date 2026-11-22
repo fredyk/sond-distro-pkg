@@ -224,7 +224,7 @@ for fork in "${forks[@]}"; do
 		grep -q '^ *license *= *"Apache-2.0 AND LGPL-2.1-or-later"' "$b/MANIFEST" && ok "incusd: licence Apache-2.0 AND LGPL-2.1-or-later" || bad "incusd: licence ($(grep '^ *license' "$b/MANIFEST"))"
 		for f in COPYING go-LICENSE NOTICE musl-COPYRIGHT LGPL-2.1 LGPL-3.0 GPL-3.0 MPL-2.0; do has_file incusd "share/licenses/incusd/$f"; done
 		bundled=$(sed -n '/^ *bundled *=/,/\]/p' "$b/MANIFEST")
-		for e in "lxc 7.0.0 LGPL-2.1-or-later" "libseccomp 2.6.2 LGPL-2.1-only" "acl 2.4.0 LGPL-2.1-or-later" \
+		for e in "lxc 7.0.0-sond1 LGPL-2.1-or-later" "libseccomp 2.6.2 LGPL-2.1-only" "acl 2.4.0 LGPL-2.1-or-later" \
 			"libcap 1.2.78 BSD-3-Clause" "cowsql 1.15.9 LGPL-3.0-only WITH LGPL-3.0-linking-exception" \
 			"raft 0.22.1 LGPL-3.0-only WITH LGPL-3.0-linking-exception" "sqlite 3.54.1 blessing" "musl 1.2.5 MIT" \
 			"libudev-zero 1.0.5 ISC" "go 1.26.9 BSD-3-Clause" "github.com/lxc/go-lxc"; do

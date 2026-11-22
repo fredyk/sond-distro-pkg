@@ -73,10 +73,10 @@ check sqlite sqlite "${SQLITE_TAG#version-}" "github.com/sqlite/sqlite@$SQLITE_C
 check raft raft "${RAFT_TAG#v}" "github.com/cowsql/raft@$RAFT_COMMIT" copyleft
 check cowsql cowsql "${COWSQL_TAG#v}" "github.com/cowsql/cowsql@$COWSQL_COMMIT" copyleft
 check attr attr "${ATTR_TAG#v}" "git.savannah.gnu.org/r/attr@$ATTR_COMMIT" copyleft
-check libcap libcap "${LIBCAP_TAG#v}" "git.kernel.org/pub/scm/libs/libcap/libcap@$LIBCAP_COMMIT"
+check libcap libcap "$LIBCAP_VERSION" "git.kernel.org/pub/scm/libs/libcap/libcap@$LIBCAP_COMMIT"
 check acl acl "${ACL_TAG#v}" "git.savannah.gnu.org/r/acl@$ACL_COMMIT" copyleft
 check libseccomp libseccomp "${LIBSECCOMP_TAG#v}" "github.com/seccomp/libseccomp@$LIBSECCOMP_COMMIT" copyleft
-check lxc lxc "${LXC_TAG#v}" "github.com/lxc/lxc@$LXC_COMMIT" copyleft
+check lxc lxc "$LXC_VERSION" "github.com/lxc/lxc@$LXC_COMMIT" copyleft
 
 if [ "$fails" -eq 0 ]; then
 	printf 'test-fork-workflows: OK\n'

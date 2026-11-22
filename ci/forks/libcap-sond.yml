@@ -22,13 +22,11 @@ jobs:
         uses: fredyk/sond-build-action@v1
         with:
           name: libcap
-          version: 1.2.78
+          version: 1.2.78-sond1
           license: BSD-3-Clause
           upstream: git.kernel.org/pub/scm/libs/libcap/libcap@a1fef85d27d0ee12729a64d1c9b2183c6007e56a
           license-files: |
             License
-          depends: |
-            linux-headers 6.12.77
           build: |
             # License offers BSD-3-Clause or GPL-2.0-only; the licence opinion elects BSD-3-Clause.
             # Only libcap.a: no psx, no pam_cap, no Go, no programs. _makenames runs on the build

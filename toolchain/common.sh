@@ -122,6 +122,7 @@ LIBUDEV_ZERO_TAG=1.0.5
 LIBUDEV_ZERO_COMMIT=7a6eee2db11f2eb0f7fd065ae9597fcd270e6734
 LIBCAP_URL=https://github.com/fredyk/libcap-sond
 LIBCAP_UPSTREAM=https://git.kernel.org/pub/scm/libs/libcap/libcap.git
+LIBCAP_VERSION=1.2.78-sond1 # -sond1: its own uapi headers win over the sysroot's since -isystem, so no linux-headers
 LIBCAP_TAG=v1.2.78
 LIBCAP_COMMIT=a1fef85d27d0ee12729a64d1c9b2183c6007e56a
 ACL_URL=https://github.com/fredyk/acl-sond
@@ -134,6 +135,7 @@ LIBSECCOMP_TAG=v2.6.2
 LIBSECCOMP_COMMIT=72d90906ebcc6a2706868d58404e10a3086ed142
 LXC_URL=https://github.com/fredyk/lxc-sond
 LXC_UPSTREAM=https://github.com/lxc/lxc
+LXC_VERSION=7.0.0-sond1 # -sond1: 7.0.0 went out holding LTO bytecode, which links under one gcc only
 LXC_TAG=v7.0.0
 LXC_COMMIT=e4415af07e3ec291205bc828e2b4e8141f91a499
 
