@@ -9,6 +9,7 @@ import threading
 import unittest
 
 from sondpkg import canonical, ed25519, logformat
+from sondpkg import publish as publish_module
 from sondpkg.tests.helpers import base_args, make_licence, make_payload_tree, run_cli
 
 LOG_SEED = bytes.fromhex("4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb")
@@ -51,6 +52,9 @@ class Stub:
 
             def do_POST(self):
                 self._answer("POST")
+
+            def do_PUT(self):
+                self._answer("PUT")
 
         self.server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -187,6 +191,65 @@ class PublishTest(RegistryCase):
             ["publish", self.bundle, "--url", self.stub.url + "/", "--token-file", self.token_file, "--key-file", self.key_file]
         )
         self.assertEqual(rc, 0, err)
+
+
+class PartsPublishTest(RegistryCase):
+    """An object larger than one part goes up in parts, then the entry with the list of parts."""
+
+    def setUp(self):
+        super().setUp()
+        self.obj = canonical.canonical_object(self.bundle)
+        self.part_bytes = 1000
+        self.assertGreater(len(self.obj), 2 * self.part_bytes)
+        self.parts = [self.obj[i : i + self.part_bytes] for i in range(0, len(self.obj), self.part_bytes)]
+        for part in self.parts:
+            self.stub.routes[("PUT", "/publish?part=sha256:" + hashlib.sha256(part).hexdigest())] = (201, b"stored\n")
+        self.stub.routes[("POST", "/publish")] = (201, b"object=sha256:00\nlog_index=0\ntree_size=1\n")
+        self.saved = publish_module.PART_BYTES
+        publish_module.PART_BYTES = self.part_bytes
+
+    def tearDown(self):
+        publish_module.PART_BYTES = self.saved
+        super().tearDown()
+
+    def test_each_part_is_put_in_order_then_the_entry_names_them(self):
+        rc, out, err = self.publish()
+        self.assertEqual(rc, 0, err)
+        puts = [r for r in self.stub.requests if r[0] == "PUT"]
+        self.assertEqual([r[3] for r in puts], self.parts)
+        for method, path, headers, body in puts:
+            self.assertEqual(headers["Authorization"], "Bearer tok-secret")
+        method, path, headers, body = self.stub.requests[-1]
+        self.assertEqual((method, path), ("POST", "/publish"))
+        head, _, rest = body.partition(b"\n\n")
+        lines = head.split(b"\n")
+        self.assertEqual(lines[0], b"sond-dist-publish-v2")
+        entry_length = int(lines[1].split(b"=")[1])
+        self.assertEqual(lines[2], b"parts-length=%d" % (len(rest) - entry_length))
+        entry, listing = rest[:entry_length], rest[entry_length:]
+        self.assertTrue(logformat.verify_entry(entry))
+        self.assertEqual(logformat.parse_entry(entry)["content"], canonical.object_id(self.bundle))
+        want = b"".join(hashlib.sha256(p).hexdigest().encode("ascii") + b"\n" for p in self.parts)
+        self.assertEqual(listing, want)
+
+    def test_a_refused_part_stops_the_publish(self):
+        self.stub.routes[("PUT", "/publish?part=sha256:" + hashlib.sha256(self.parts[1]).hexdigest())] = (413, b"too big\n")
+        rc, out, err = self.publish()
+        self.assertEqual((rc, out), (1, ""))
+        self.assertIn("413", err)
+        self.assertFalse([r for r in self.stub.requests if r[0] == "POST"])
+
+    def test_a_part_already_there_is_fine(self):
+        self.stub.routes[("PUT", "/publish?part=sha256:" + hashlib.sha256(self.parts[0]).hexdigest())] = (200, b"exists\n")
+        rc, out, err = self.publish()
+        self.assertEqual(rc, 0, err)
+
+    def test_an_object_within_one_part_still_goes_whole(self):
+        publish_module.PART_BYTES = len(self.obj) + 4096
+        rc, out, err = self.publish()
+        self.assertEqual(rc, 0, err)
+        self.assertEqual([r[0] for r in self.stub.requests], ["POST"])
+        self.assertTrue(self.stub.requests[0][3].startswith(b"sond-dist-publish-v1\n"))
 
 
 class VerifyPublishedTest(RegistryCase):

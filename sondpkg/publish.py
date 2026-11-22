@@ -35,16 +35,21 @@ from sondpkg.errors import PackagerError
 EXIT_PUBLISHED = 0
 EXIT_ALREADY_LOGGED = 3
 TIMEOUT_SECONDS = 60
+# Cloudflare, in front of the registry, refuses a request body over 100 MB. An object larger than
+# one part goes up in parts of this size, then the entry with the list of their digests.
+PART_BYTES = 32 * 1024 * 1024
+# The registry assembles the parts (streamed through SHA-256) before it answers.
+ASSEMBLE_TIMEOUT_SECONDS = 300
 # The registry sits behind Cloudflare, which refuses urllib's default User-Agent (error 1010).
 USER_AGENT = "sondpkg/1"
 
 
-def _request(method, url, body=None, headers=None):
+def _request(method, url, body=None, headers=None, timeout=TIMEOUT_SECONDS):
     """(status, body bytes); a transport failure is a PackagerError, an HTTP error status is not."""
     request = urllib.request.Request(url, data=body, method=method, headers=dict(headers or {}))
     request.add_header("User-Agent", USER_AGENT)
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.status, response.read()
     except urllib.error.HTTPError as error:
         return error.code, error.read()
@@ -73,6 +78,35 @@ def frame(entry, obj):
         + entry
         + obj
     )
+
+
+def frame_parts(entry, listing):
+    return (
+        b"sond-dist-publish-v2\nentry-length=%d\nparts-length=%d\n\n" % (len(entry), len(listing))
+        + entry
+        + listing
+    )
+
+
+def _put_parts(base, obj, auth):
+    """PUT each part of `obj`; returns the newline-terminated list of their digests."""
+    listing = b""
+    for start in range(0, len(obj), PART_BYTES):
+        part = obj[start : start + PART_BYTES]
+        digest = hashlib.sha256(part).hexdigest()
+        status, body = _request(
+            "PUT",
+            base + "/publish?part=sha256:" + digest,
+            part,
+            {"Authorization": auth, "Content-Type": "application/octet-stream"},
+        )
+        if status not in (200, 201):
+            raise PackagerError(
+                "part %d of the object refused with HTTP %d: %s"
+                % (start // PART_BYTES, status, body.decode("utf-8", "replace").strip())
+            )
+        listing += digest.encode("ascii") + b"\n"
+    return listing
 
 
 def _parse_reply(body):
@@ -127,12 +161,13 @@ def publish(bundle_dir, url, token_file, key_file, now=None):
         manifest.name, manifest.version, object_id, ed25519.public_key(seed).hex(), manifest.license, stamp
     )
     entry = logformat.sign_entry(seed, text)
-    status, body = _request(
-        "POST",
-        _base(url) + "/publish",
-        frame(entry, obj),
-        {"Authorization": "Bearer " + token, "Content-Type": "application/octet-stream"},
-    )
+    auth = "Bearer " + token
+    headers = {"Authorization": auth, "Content-Type": "application/octet-stream"}
+    if len(obj) > PART_BYTES:
+        body = frame_parts(entry, _put_parts(_base(url), obj, auth))
+        status, body = _request("POST", _base(url) + "/publish", body, headers, ASSEMBLE_TIMEOUT_SECONDS)
+    else:
+        status, body = _request("POST", _base(url) + "/publish", frame(entry, obj), headers)
     if status not in (200, 201):
         raise PackagerError(
             "publish refused with HTTP %d: %s" % (status, body.decode("utf-8", "replace").strip())
