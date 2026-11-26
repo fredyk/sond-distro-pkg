@@ -1,7 +1,8 @@
 #!/bin/bash
 # Shape checks for the qemu and edk2-ovmf fork recipes: what incus 7.6 needs to start a q35 UEFI
-# VM. qemu-system-x86_64 and qemu-img, static against musl, x86_64 KVM only, with spice (incus
-# writes a spice section for every VM) and the source lane; OVMF under the names
+# VM. qemu-system-x86_64 and qemu-img, static against musl, x86_64 KVM only, without spice
+# (incus 7.6 probes query-spice and leaves the spice sections out when qemu lacks it) and the
+# source lane; OVMF under the names
 # internal/server/instance/drivers/edk2/driver_edk2.go searches in /usr/share/OVMF.
 # Offline: no network, no build.
 #
@@ -37,10 +38,19 @@ if [ -f "$q" ]; then
 	has "$q" '--target-list=x86_64-softmmu ' "qemu: one target, x86_64-softmmu"
 	has "$q" '--enable-kvm --disable-tcg' "qemu: KVM only"
 	has "$q" '--disable-slirp' "qemu: no slirp"
-	has "$q" '--enable-spice' "qemu: spice on (incus starts every VM with a spice section)"
+	has "$q" '--disable-spice' "qemu: configured --disable-spice"
+	grep -qE -- '--enable-spice' "$q" && bad "qemu: never --enable-spice" || ok "qemu: never --enable-spice"
+	deps=$(awk '/^          depends: \|$/{f=1; next} f && /^          [a-z-]+:/{f=0} f' "$q")
+	printf '%s\n' "$deps" | grep -qiE 'spice' && bad "qemu: no spice in depends" || ok "qemu: no spice in depends"
+	grep -q 'vgabios-qxl.bin' "$q" && bad "qemu: no qxl VGA ROM (qxl is spice-only)" || ok "qemu: no qxl VGA ROM (qxl is spice-only)"
+	for d in glib pixman zlib; do
+		printf '%s\n' "$deps" | grep -qE "^ +$d " && ok "qemu: depends on $d" || bad "qemu: depends on $d"
+	done
 	has "$q" 'install -D -m 0755 build/qemu-system-x86_64 "\$SOND_PAYLOAD/bin/qemu-system-x86_64"' "qemu: ships bin/qemu-system-x86_64"
 	has "$q" 'install -D -m 0755 build/qemu-img "\$SOND_PAYLOAD/bin/qemu-img"' "qemu: ships bin/qemu-img"
 	has "$q" 'bios-256k.bin' "qemu: ships bios-256k.bin (security.csm VMs)"
+	# incus 7.6 looks for the CSM firmware as /usr/share/seabios/bios-256k.bin.
+	has "$q" '"\$SOND_PAYLOAD/share/seabios/bios-256k.bin"' "qemu: ships share/seabios/bios-256k.bin where incus searches for CSM"
 	has "$q" 'efi-virtio.rom' "qemu: ships the virtio option ROM"
 	has "$q" 'keymaps/en-us' "qemu: ships the en-us keymap"
 	has "$q" 'COPYING.LIB=share/licenses/qemu/LGPL-2.1' "qemu: ships the LGPL-2.1 text"
