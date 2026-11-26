@@ -1,0 +1,63 @@
+# Builds the rclone package from the official rclone v1.76.0 linux-amd64 release
+# zip: the build step downloads the zip, requires its pinned sha256 (the line for
+# that file in downloads.rclone.org/v1.76.0/SHA256SUMS), requires the same for the
+# ELF member inside, and installs it as bin/rclone. Nothing is compiled here; the
+# bundled licences come from the build info the binary carries itself (go version -m
+# and sondpkg go-licences, build.sh's Go side). Lives in the fork as
+# .github/workflows/sond-package-rclone.yml. Generated from fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator (no push credential on this VM):
+#   secretd-github fork --name rclone-sond https://github.com/rclone/rclone
+#   secretd-github branch-create --name sond --sha e982ff36668f5130d94b4f70409babb3d964df42 fredyk/rclone-sond
+# then this file pushed to that branch under .github/workflows/.
+name: sond package rclone
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.3
+          cache: false
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: rclone
+          version: 1.76.0
+          license: MIT
+          upstream: github.com/rclone/rclone@e982ff36668f5130d94b4f70409babb3d964df42
+          linkage: static Go 1.27.3, CGO_ENABLED=0
+          license-files: |
+            COPYING
+          build: |
+            # The 32.194.302-byte release zip, sha256 b00f00b3...e46df7 (15th line of the
+            # release's SHA256SUMS); the member rclone-v1.76.0-linux-amd64/rclone is the static
+            # x86-64 ELF with sha256 62e4d3e5...611527e. Both checks below are what make this
+            # package reproducible from the official release alone.
+            mkdir -p "$SOND_PAYLOAD/bin"
+            curl -fsSL --retry 3 -o rclone.zip \
+              https://downloads.rclone.org/v1.76.0/rclone-v1.76.0-linux-amd64.zip
+            printf 'b00f00b3266c3764413afe599d3ec316f6f43b3e0ea8a0bc1d186d2133e46df7  rclone.zip\n' | sha256sum -c -
+            unzip -q rclone.zip rclone-v1.76.0-linux-amd64/rclone
+            printf '62e4d3e5432f2c685f1834b8bb342058ff0611c99d048aeb44bb8d8fd611527e  rclone-v1.76.0-linux-amd64/rclone\n' | sha256sum -c -
+            install -m 0755 rclone-v1.76.0-linux-amd64/rclone "$SOND_PAYLOAD/bin/rclone"
+            # The binary arrived whole, so its modules are in nobody's cache yet. Fill the
+            # job's module cache from this pinned tree's go.mod (verified against go.sum) so
+            # go-licences can read every linked module's licence files after this step ends.
+            go mod download all
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}

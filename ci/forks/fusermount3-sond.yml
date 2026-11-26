@@ -1,0 +1,56 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the fusermount3 package (the FUSE mount helper that rclone mount execs by name)
+# from this fork's sond branch against the pinned musl and publishes it to dist.sond.dev,
+# its corresponding source first. The utility is GPL-2.0-only (util/fusermount.c, no
+# "or later"); libfuse's LGPL-2.1 library is not shipped. Lives in the fork as
+# .github/workflows/sond-package-fusermount3.yml. Generated from fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator (no push credential on this VM):
+#   secretd-github fork --name fusermount3-sond https://github.com/libfuse/libfuse
+#   secretd-github branch-create --name sond --sha 7a92727d97c10290b3501d86a194738973edb61d fredyk/fusermount3-sond
+# then this file pushed to that branch under .github/workflows/, and every file the fork adds
+# carries the Sond change notice (licence opinion, section 3).
+name: sond package fusermount3
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: fusermount3
+          version: 3.16.2
+          license: GPL-2.0-only
+          upstream: github.com/libfuse/libfuse@7a92727d97c10290b3501d86a194738973edb61d
+          license-files: |
+            COPYING
+          build: |
+            # disable-mtab defines IGNORE_MTAB, which folds mtab_needs_update() to a constant 0
+            # (lib/mount_util.c:40-41): the helper always goes straight to the mount(2)/umount2()
+            # syscalls and neither reads nor recreates /etc/mtab. The Sond box has no /etc/mtab and
+            # no /bin/mount, and the plain ignore-mtab path still opens /etc/mtab.fuselock first.
+            # meson here only configures; a full install is not run, because this package ships
+            # exactly one file: the helper (util/fusermount.c + lib/mount_util.c, the link maps
+            # show musl pulled in). No library, headers, mount.fuse3, examples or udev rules.
+            CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" \
+              meson setup build --prefix=/ --libdir=lib --buildtype=release \
+                --default-library=static -Ddisable-mtab=true -Dexamples=false -Dtests=false
+            ninja -C build fusermount3
+            install -D -m 0755 build/util/fusermount3 "$SOND_PAYLOAD/bin/fusermount3"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
