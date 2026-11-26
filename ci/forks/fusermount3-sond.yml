@@ -36,7 +36,7 @@ jobs:
           upstream: github.com/libfuse/libfuse@7a92727d97c10290b3501d86a194738973edb61d
           license-files: |
             LICENSE
-            GPL2.txt=share/licenses/fusermount3/GPL-2.0
+            GPL2.txt=share/licenses/fusermount3/COPYING
             LGPL2.txt=share/licenses/fusermount3/LGPL-2.1
           build: |
             # disable-mtab defines IGNORE_MTAB, which folds mtab_needs_update() to a constant 0

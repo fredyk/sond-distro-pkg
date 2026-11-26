@@ -40,6 +40,8 @@ TIMEOUT_SECONDS = 60
 PART_BYTES = 32 * 1024 * 1024
 # The registry assembles the parts (streamed through SHA-256) before it answers.
 ASSEMBLE_TIMEOUT_SECONDS = 300
+# An object whose bytes do not hash to its id is fetched again, up to this many times in all.
+OBJECT_FETCH_ATTEMPTS = 3
 # The registry sits behind Cloudflare, which refuses urllib's default User-Agent (error 1010).
 USER_AGENT = "sondpkg/1"
 
@@ -184,6 +186,26 @@ def _get(url, what):
     return body
 
 
+def _fetch_object(base, object_id):
+    """The object's bytes, fetched again while they do not hash to its id.
+
+    The registry is reached through proxies that re-chunk the body without Content-Length, so a
+    body cut short arrives as a clean end of stream; the content address is the only check, and a
+    retry is safe because the bytes asked for never change.
+    """
+    failure = None
+    for _ in range(OBJECT_FETCH_ATTEMPTS):
+        try:
+            served = _get(base + "/o/" + object_id, "object")
+        except PackagerError as error:
+            failure = error
+            continue
+        if "sha256:" + hashlib.sha256(served).hexdigest() == object_id:
+            return served
+        failure = PackagerError("the stored object does not hash to " + object_id)
+    raise failure
+
+
 def _checked(base, name, version, log_key=None):
     """The logged entry for name/version, its object and its inclusion, all checked.
 
@@ -205,9 +227,7 @@ def _checked(base, name, version, log_key=None):
         raise PackagerError("the logged entry is for another name or version")
     object_id = entry["content"]
 
-    served = _get(base + "/o/" + object_id, "object")
-    if "sha256:" + hashlib.sha256(served).hexdigest() != object_id:
-        raise PackagerError("the stored object does not hash to " + object_id)
+    served = _fetch_object(base, object_id)
 
     key = log_key or _get(base + "/log/key", "log key").decode("ascii", "replace").strip()
     sth_text = _get(base + "/log/latest", "tree head")

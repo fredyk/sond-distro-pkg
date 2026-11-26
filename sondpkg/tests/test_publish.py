@@ -40,7 +40,10 @@ class Stub:
                 length = int(self.headers.get("Content-Length") or 0)
                 body = self.rfile.read(length) if length else b""
                 stub.requests.append((method, self.path, dict(self.headers), body))
-                status, payload = stub.routes.get((method, self.path), (404, b"not found\n"))
+                answer = stub.routes.get((method, self.path), (404, b"not found\n"))
+                if isinstance(answer, list):  # answered in turn; the last one repeats
+                    answer = answer.pop(0) if len(answer) > 1 else answer[0]
+                status, payload = answer
                 self.send_response(status)
                 self.send_header("Content-Length", str(len(payload)))
                 self.send_header("Connection", "close")
@@ -313,6 +316,22 @@ class VerifyPublishedTest(RegistryCase):
     def test_a_tampered_object_fails(self):
         self.serve(obj=self.object_bytes + b"x")
         self.assertEqual(self.verify()[0], 1)
+
+    def test_an_object_cut_short_on_the_way_is_fetched_again(self):
+        # a proxy that re-chunks the body can end it early with no error: only the hash tells
+        path = ("GET", "/o/" + self.object_id)
+        self.stub.routes[path] = [(200, self.object_bytes[:-7]), (200, self.object_bytes)]
+        rc, out, err = self.verify()
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(sum(1 for r in self.stub.requests if (r[0], r[1]) == path), 2)
+
+    def test_an_object_that_never_hashes_right_fails_after_three_fetches(self):
+        path = ("GET", "/o/" + self.object_id)
+        self.serve(obj=self.object_bytes + b"x")
+        rc, out, err = self.verify()
+        self.assertEqual(rc, 1)
+        self.assertIn("does not hash to", err)
+        self.assertEqual(sum(1 for r in self.stub.requests if (r[0], r[1]) == path), 3)
 
     def test_a_tree_head_signed_by_another_key_fails(self):
         other = bytes.fromhex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")

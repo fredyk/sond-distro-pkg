@@ -67,6 +67,36 @@ for n in range(i + 1, len(lines)):
 PY
 }
 
+# --- every licence text sondpkg will demand is shipped by the recipe, for the binary and its
+# -source (build.sh maps share/licenses/<name>/ to share/licenses/<name>-source/) ---
+for pkg in rclone fusermount3; do
+	yml=$here/forks/$pkg-sond.yml
+	[ -f "$yml" ] || continue
+	missing=$(python3 - "$DISTRO" "$yml" "$pkg" "$(field "$yml" license)" <<'PY2'
+import sys
+sys.path.insert(0, sys.argv[1])
+from sondpkg import rules
+yml, name, licence = sys.argv[2:]
+lines, dests, inside = open(yml).read().split("\n"), set(), False
+for line in lines:
+    s = line.strip()
+    if s == "license-files: |":
+        inside = True
+        continue
+    if inside:
+        if not s or (s.endswith(":") or ": " in s) and "=" not in s:
+            break
+        src, _, dest = s.partition("=")
+        dests.add(dest or "share/licenses/%s/%s" % (name, src.rsplit("/", 1)[-1]))
+need = [r for r, _ in rules.required_licence_files(name, "static", licence)]
+print(" ".join(r for r in need if r not in dests))
+PY2
+)
+	[ -z "$missing" ] \
+		&& ok "$pkg-sond.yml: ships every licence text sondpkg requires for $(field "$yml" license)" \
+		|| bad "$pkg-sond.yml: ships every licence text sondpkg requires (missing: $missing)"
+done
+
 # --- rclone: recipe pins the official zip and member; derivation is reproducible ---
 yml=$here/forks/rclone-sond.yml
 if [ -f "$yml" ]; then
@@ -141,10 +171,6 @@ if [ -f "$yml" ]; then
 	[ "$(field "$yml" license)" = "GPL-2.0-only AND LGPL-2.1-only" ] \
 		&& ok "fusermount3-sond.yml: license GPL-2.0-only AND LGPL-2.1-only" \
 		|| bad "fusermount3-sond.yml: license GPL-2.0-only AND LGPL-2.1-only (found: $(field "$yml" license))"
-	awk '/license-files:/{f=1;next} f&&/^ *[a-z-]+:/{exit} f{print $1}' "$yml" | sort | tr '\n' ' ' \
-		| grep -qx 'GPL2.txt=share/licenses/fusermount3/GPL-2.0 LGPL2.txt=share/licenses/fusermount3/LGPL-2.1 LICENSE ' \
-		&& ok "fusermount3-sond.yml: ships LICENSE, GPL2.txt and LGPL2.txt" \
-		|| bad "fusermount3-sond.yml: ships LICENSE, GPL2.txt and LGPL2.txt"
 	l=$(field "$yml" license)
 	rc=0
 	python3 "$DISTRO/sondpkg/bin/sondpkg" needs-source "$l" >/dev/null || rc=$?
