@@ -75,7 +75,7 @@ if [ -f "$yml" ]; then
 		grep -qE "grep -q '\^$lib' config\.mk && exit 1" "$yml" && ok "the build refuses a config.mk with $lib" \
 			|| bad "the build refuses a config.mk with $lib"
 	done
-	# The Makefile sets CC := gcc, so CC goes on the command line; CFLAGS through the
+	# The top Makefile sets CC := gcc, so CC goes on the command line; CFLAGS through the
 	# environment, which the Makefile appends to its own.
 	grep -qE 'CFLAGS="\$SOND_CFLAGS" .*make .*CC="\$SOND_CC"' "$yml" && ok "CC on make's command line, CFLAGS in the environment" \
 		|| bad "CC on make's command line, CFLAGS in the environment"
@@ -83,8 +83,9 @@ if [ -f "$yml" ]; then
 	# up by dlsym and fails; SHARED_LIBS=n compiles static-syms.o instead.
 	grep -qE 'SHARED_LIBS=n' "$yml" && ok "SHARED_LIBS=n: link kinds resolved without dlopen" \
 		|| bad "SHARED_LIBS=n: link kinds resolved without dlopen"
-	grep -qE 'make .*-C ip ip$' "$yml" && ok "builds only ip/ip (after lib)" || bad "builds only ip/ip"
-	grep -qE 'make .*-C lib$' "$yml" && ok "builds lib/ first" || bad "builds lib/ first"
+	# Through the top Makefile (it carries -I../include and the defines down), lib and ip only.
+	grep -qE 'make .*SUBDIRS="lib ip"$' "$yml" && ok "builds only lib/ and ip/ through the top Makefile" \
+		|| bad "builds only lib/ and ip/ through the top Makefile"
 	grep -qE -- '-static' "$yml" && ok "the executable is linked -static" || bad "the executable is linked -static"
 	grep -qE 'install -D -m 0755 ip/ip "\$SOND_PAYLOAD/bin/ip"' "$yml" && ok "ships bin/ip" || bad "ships bin/ip"
 	n=$(grep -c 'SOND_PAYLOAD' "$yml" || true)
