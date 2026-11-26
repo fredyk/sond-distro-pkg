@@ -1,0 +1,54 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the ca-certificates package: Mozilla's root certificates (certdata.txt, MPL-2.0) as the
+# one PEM file Go's crypto/x509 reads first on linux, /etc/ssl/certs/ca-certificates.crt. The
+# bundle is certifi's certifi/cacert.pem at the pinned tag 2026.11.20 of this fork, required by
+# sha256 before it is installed; nothing is compiled. MPL-2.0 is copyleft per file, so the
+# corresponding source publishes first. Lives in the fork as
+# .github/workflows/sond-package-ca-certificates.yml. Generated from fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator:
+#   secretd-github fork --name ca-certificates-sond https://github.com/certifi/python-certifi
+#   secretd-github branch-create --name sond --sha bf6a4859116b0cba96673893e394298bbe529b1f fredyk/ca-certificates-sond
+# then this file pushed to that branch under .github/workflows/.
+name: sond package ca-certificates
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: ca-certificates
+          version: 2026.11.20
+          license: MPL-2.0
+          linkage: none (data)
+          upstream: github.com/certifi/python-certifi@bf6a4859116b0cba96673893e394298bbe529b1f
+          license-files: |
+            LICENSE=share/licenses/ca-certificates/LICENSE
+            .sond-licences/MPL-2.0=share/licenses/ca-certificates/MPL-2.0
+          build: |
+            # 113 certificates, sha256 bb92c6ac...fdbe00d1 at this tag: the check is what makes
+            # the package the pinned bundle and nothing else.
+            printf 'bb92c6ac31c92f4f553bffd6bf093db02c858c23e111b0b4df9bafa3fdbe00d1  certifi/cacert.pem\n' | sha256sum -c -
+            install -D -m 0644 certifi/cacert.pem "$SOND_PAYLOAD/etc/ssl/certs/ca-certificates.crt"
+            # The bundle's header points to the MPL 2.0; its full text, byte for byte mozilla.org's.
+            mkdir -p .sond-licences
+            curl -fsSL --retry 3 -o .sond-licences/MPL-2.0 https://www.mozilla.org/media/MPL/2.0/index.txt
+            printf '3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04  .sond-licences/MPL-2.0\n' | sha256sum -c -
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}

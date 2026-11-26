@@ -21,6 +21,8 @@ LICENSE_ATOMS = frozenset({
     # the C libraries incusd links (section 2.10, its table), each published as a package:
     # SQLite, libuv (MIT with tree.h and inet.c), cowsql and raft
     "blessing", "BSD-2-Clause", "ISC", "LGPL-3.0-only",
+    # ca-certificates: Mozilla's root certificates (certdata.txt) as one PEM bundle
+    "MPL-2.0",
 })
 # Identifiers a component linked into the package may use.
 BUNDLED_ATOMS = LICENSE_ATOMS | frozenset({

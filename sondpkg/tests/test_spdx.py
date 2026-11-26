@@ -37,7 +37,7 @@ class SpdxTest(unittest.TestCase):
         self.assertIn("GPL-3.0-only", str(ctx.exception))
         # bundled-only identifiers are not a package licence on their own
         with self.assertRaises(PackagerError):
-            spdx.check_license("MPL-2.0")
+            spdx.check_license("Unlicense")
 
     def test_linux_headers_licence_is_admitted(self):
         # the licence opinion, section 2.11 (1): the kernel UAPI headers' computed expression
@@ -45,6 +45,11 @@ class SpdxTest(unittest.TestCase):
             "GPL-2.0-only WITH Linux-syscall-note AND LGPL-2.1-only WITH Linux-syscall-note"
             " AND MIT AND BSD-3-Clause"
         )
+
+    def test_mozillas_root_store_is_admitted_as_a_package_and_takes_the_source_lane(self):
+        # ca-certificates ships Mozilla's root certificates (certdata.txt, MPL-2.0) as one PEM file.
+        spdx.check_license("MPL-2.0")
+        self.assertTrue(spdx.is_copyleft("MPL-2.0"))
 
     def test_the_c_libraries_incusd_links_are_admitted_as_packages(self):
         # the licence opinion's incusd table: each library is published as a package of its own,
