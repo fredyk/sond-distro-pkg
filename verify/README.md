@@ -44,7 +44,7 @@ artifact to keep going.
 
 1. Verify binaries before consuming: sha256 against the measured constants, `file` must say
    `statically linked`; the toybox applet list must be exactly `cat cp echo grep ls mkdir mount mv
-   ps rm`; `mksh` must report `MIRBSD KSH R59`.
+   ps rm setfattr`; `mksh` must report `MIRBSD KSH R59`.
 2. Source material by hash: `git archive` tarballs (toybox, mksh, musl), fork patches (counted, or
    declared absent), build recipes from the toolchain worktree.
 3. Licence texts verbatim from the fork trees: toybox `LICENSE` (0BSD), musl `COPYRIGHT` complete

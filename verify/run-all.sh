@@ -45,8 +45,8 @@ TOYBOX_TAG=$TOYBOX_VER
 MKSH_TAG=mksh-R59
 MUSL_TAG=v$MUSL_VER
 
-TOYBOX_SYMLINKS="ls ps cat cp mv rm mkdir mount echo grep"
-TOYBOX_APPLETS="cat cp echo grep ls mkdir mount mv ps rm"
+TOYBOX_SYMLINKS="ls ps cat cp mv rm mkdir mount echo grep setfattr"
+TOYBOX_APPLETS="cat cp echo grep ls mkdir mount mv ps rm setfattr"
 
 # Image area scripts, used directly: READY-image was never published.
 IM_WORKTREE=$REPO
@@ -425,7 +425,7 @@ say "symlink evidence: $(grep -F -- '-> toybox' "$plain" | head -n1)"
 say "symlink evidence: $(grep -F -- '-> mksh' "$plain" | head -n1)"
 
 # The frozen toybox applet list, as printed by the guest binary.
-grep -qE "^$TOYBOX_APPLETS[[:space:]]*$" "$plain" || die "guest toybox applet list is not the frozen ten"
+grep -qE "^$TOYBOX_APPLETS[[:space:]]*$" "$plain" || die "guest toybox applet list is not the frozen TOYBOX_APPLETS"
 say "toybox applets in guest: $(grep -E "^$TOYBOX_APPLETS[[:space:]]*$" "$plain" | head -n1)"
 
 # Licences are visible inside the guest.

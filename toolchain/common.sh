@@ -181,9 +181,10 @@ repro_ldflags() {
 	printf '%s' "-Wl,--build-id=none"
 }
 
-# The ten utilities this area has to ship. No sh: /bin/sh is mksh, and the
+# The utilities this area has to ship (setfattr: incusd refuses to start
+# without it on PATH). No sh: /bin/sh is mksh, and the
 # toybox toysh lives in toys/pending, which is not built.
-TOYBOX_COMMANDS="cat cp echo grep ls mkdir mount mv ps rm"
+TOYBOX_COMMANDS="cat cp echo grep ls mkdir mount mv ps rm setfattr"
 
 # Absolute path of the two delivered binaries, once published.
 TOYBOX_BIN=$ARTIFACTS/bin/toybox

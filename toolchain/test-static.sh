@@ -1,6 +1,6 @@
 #!/bin/bash
 # Gate 2 of 2: the published binaries must be static musl, must expose exactly
-# the ten utilities this area ships, and every one of them must actually run on
+# the utilities this area ships, and every one of them must actually run on
 # this host without root.
 #
 # Exit 0 only when every check passes. Output is one line per check.
