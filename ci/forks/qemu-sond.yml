@@ -3,9 +3,10 @@
 # driver_qemu.go looks qemu-system-x86_64 up in PATH and runs qemu-img by name; incus requires
 # QEMU 8.2 or later, doc/requirements.md) from this fork's sond branch, tag v11.1.3, static
 # against the pinned musl, and publishes it to dist.sond.dev, its corresponding source first.
-# One target (x86_64-softmmu), KVM only (no TCG), no GUI, no slirp. incus starts every VM with a
-# spice section, so spice is enabled. Firmware comes from the edk2-ovmf package; qemu's own
-# share/ data (option ROMs, keymaps, bios-256k.bin for CSM) ships under share/qemu.
+# One target (x86_64-softmmu), KVM only (no TCG), no GUI, no slirp, no spice: incus 7.6 probes
+# query-spice and leaves the spice sections out when qemu lacks it. Firmware comes from the
+# edk2-ovmf package; qemu's own share/ data (option ROMs, keymaps) ships under share/qemu, and
+# bios-256k.bin also under share/seabios, where incus looks for the CSM firmware.
 # Lives in the fork as .github/workflows/sond-package-qemu.yml. Generated from
 # fredyk/sond-distro-pkg ci/forks.
 # Fork creation, for the operator:
@@ -41,12 +42,13 @@ jobs:
             COPYING
             COPYING.LIB=share/licenses/qemu/LGPL-2.1
             LICENSE=share/licenses/qemu/LICENSE
+          # TODO(pin): glib, pixman and zlib versions are placeholders until the glib-forks and
+          # zlib-pixman-forks recipes land; pin them to the versions those publish.
           depends: |
             linux-headers 6.12.77
             glib 2.86.0
             pixman 0.46.4
             zlib 1.3.1
-            spice 0.16.0
           build: |
             # QEMU's documented configure (docs/devel/build-system.rst): --static links every
             # dependency from the sysroot's archives (pkg-config --static). Only what an incus
@@ -57,7 +59,7 @@ jobs:
                 --target-list=x86_64-softmmu --enable-kvm --disable-tcg \
                 --disable-user --disable-docs --disable-gtk --disable-sdl --disable-vnc \
                 --disable-opengl --disable-slirp --disable-curses --disable-audio \
-                --enable-spice --enable-vhost-net --enable-vhost-user --enable-attr \
+                --disable-spice --enable-vhost-net --enable-vhost-user --enable-attr \
                 --disable-werror --enable-tools --without-default-features
             make -j"$(nproc)" qemu-system-x86_64 qemu-img
             install -D -m 0755 build/qemu-system-x86_64 "$SOND_PAYLOAD/bin/qemu-system-x86_64"
@@ -66,11 +68,13 @@ jobs:
             # linuxboot_dma.bin, bios-256k.bin and the keymaps qemu loads at start.
             mkdir -p "$SOND_PAYLOAD/share/qemu/keymaps"
             for f in bios-256k.bin kvmvapic.bin linuxboot_dma.bin multiboot_dma.bin \
-              efi-virtio.rom efi-e1000.rom efi-e1000e.rom vgabios-stdvga.bin vgabios-virtio.bin \
-              vgabios-qxl.bin; do
+              efi-virtio.rom efi-e1000.rom efi-e1000e.rom vgabios-stdvga.bin vgabios-virtio.bin; do
               install -m 0644 "pc-bios/$f" "$SOND_PAYLOAD/share/qemu/$f"
             done
             install -m 0644 pc-bios/keymaps/en-us "$SOND_PAYLOAD/share/qemu/keymaps/en-us"
+            # incus 7.6 looks for the CSM firmware (security.csm) as
+            # /usr/share/seabios/bios-256k.bin, not under share/qemu.
+            install -D -m 0644 pc-bios/bios-256k.bin "$SOND_PAYLOAD/share/seabios/bios-256k.bin"
       - uses: fredyk/sond-publish-action@v1
         with:
           bundle: ${{ steps.build.outputs.bundle }}
