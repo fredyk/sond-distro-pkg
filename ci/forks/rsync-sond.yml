@@ -1,0 +1,62 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the rsync package (the rsync command: incusd looks it up on PATH at startup, copies
+# local volumes with "rsync -a -HA --xattrs" and receives dir volumes from "incus copy --refresh"
+# with "rsync --server ... --xattrs --delete --compress", internal/rsync/rsync.go) from this
+# fork's sond branch, static against the pinned musl, and publishes it, its corresponding source
+# first, to dist.sond.dev. Only bin/rsync ships: no rsync-ssl, no rrsync, no manpages (md2man off).
+# What incus asks of it, and nothing more: ACLs (-A) through the acl package's libacl; xattrs
+# through musl; --compress through the bundled zlib. openssl, xxhash, zstd and lz4 are off: incus
+# never asks for a checksum or compression choice, and two rsyncs without them negotiate md5 and
+# zlib. Lives in the fork as .github/workflows/sond-package-rsync.yml. Generated from
+# fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator:
+#   secretd-github fork --name rsync-sond https://github.com/RsyncProject/rsync
+#   secretd-github branch-create --name sond --sha 41bbd895668767e155b2eb6da64f37afa9cb8724 fredyk/rsync-sond
+# then this file pushed to that branch under .github/workflows/.
+name: sond package rsync
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: rsync
+          version: 3.5.2
+          license: GPL-3.0-or-later
+          upstream: github.com/RsyncProject/rsync@41bbd895668767e155b2eb6da64f37afa9cb8724
+          license-files: |
+            COPYING
+          depends: |
+            linux-headers 6.12.77
+            attr 2.6.0
+            acl 2.4.0
+          build: |
+            # configure is committed at the tag: no autoreconf. Bundled zlib and popt.
+            ./configure --disable-md2man --disable-openssl --disable-xxhash --disable-zstd \
+              --disable-lz4 --disable-iconv --disable-locale --disable-roll-simd --disable-md5-asm \
+              --with-included-zlib=yes --with-included-popt=yes \
+              --enable-acl-support --enable-xattr-support \
+              CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" LIBS="-lacl -lattr"
+            grep -q '^#define SUPPORT_ACLS 1' config.h
+            grep -q '^#define SUPPORT_XATTRS 1' config.h
+            make -j"$(nproc)" rsync
+            install -D -m 0755 rsync "$SOND_PAYLOAD/bin/rsync"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
