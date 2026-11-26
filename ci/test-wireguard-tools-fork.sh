@@ -65,6 +65,8 @@ if [ -f "$yml" ]; then
 		|| bad "license GPL-2.0-only AND LGPL-2.1-or-later AND MIT (found: $l)"
 	# wg includes <linux/types.h> (curve25519.c): the sond runner has no kernel headers of its own.
 	grep -qE '^ +linux-headers 6\.12\.77$' "$yml" && ok "depends on linux-headers 6.12.77" || bad "depends on linux-headers 6.12.77"
+	# The bundled uapi must win over linux-headers 6.12 (no WGALLOWEDIP_A_FLAGS there).
+	grep -qF 'CFLAGS="-isystem uapi/linux $SOND_CFLAGS"' "$yml" && ok "bundled uapi first" || bad "bundled uapi first"
 	grep -qF 20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95 "$yml" \
 		&& ok "the LGPL-2.1 text is checked against gnu.org's sha256" || bad "the LGPL-2.1 text is checked against gnu.org's sha256"
 	grep -qE 'make -C src .*wg$' "$yml" && ok "builds only the wg target" || bad "builds only the wg target"
