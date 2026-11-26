@@ -36,6 +36,8 @@ jobs:
           license-files: |
             COPYING
             .sond-licences/LGPL-2.1=share/licenses/wireguard-tools/LGPL-2.1
+          depends: |
+            linux-headers 6.12.77
           build: |
             # CFLAGS and LDFLAGS through the environment: on the command line they would override
             # the Makefile's own "CFLAGS +=" (-isystem uapi/linux, -std=gnu99, -D_GNU_SOURCE).

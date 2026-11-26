@@ -63,6 +63,8 @@ if [ -f "$yml" ]; then
 	# and netlink.h, a minimized libmnl (LGPL-2.1+), all under src/ at the pinned tag.
 	[ "$l" = "GPL-2.0-only AND LGPL-2.1-or-later AND MIT" ] && ok "license GPL-2.0-only AND LGPL-2.1-or-later AND MIT" \
 		|| bad "license GPL-2.0-only AND LGPL-2.1-or-later AND MIT (found: $l)"
+	# wg includes <linux/types.h> (curve25519.c): the sond runner has no kernel headers of its own.
+	grep -qE '^ +linux-headers 6\.12\.77$' "$yml" && ok "depends on linux-headers 6.12.77" || bad "depends on linux-headers 6.12.77"
 	grep -qF 20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95 "$yml" \
 		&& ok "the LGPL-2.1 text is checked against gnu.org's sha256" || bad "the LGPL-2.1 text is checked against gnu.org's sha256"
 	grep -qE 'make -C src .*wg$' "$yml" && ok "builds only the wg target" || bad "builds only the wg target"
