@@ -70,6 +70,8 @@ if [ -f "$yml" ]; then
 	# build.sh reads .d files to know which linux-headers notices ship; the Makefile's -MMD leaves
 	# system headers out, so a -M pass through $SOND_CC writes complete ones.
 	grep -qF -- '-M -MF "${c%.c}.sond.d"' "$yml" && ok "dependency files list the kernel headers" || bad "dependency files list the kernel headers"
+	# www.gnu.org went unreachable (26/11); ftp.gnu.org serves the same bytes, checked by the same sha.
+	grep -qF 'https://ftp.gnu.org/gnu/Licenses/lgpl-2.1.txt' "$yml" && ok "LGPL text has a second source" || bad "LGPL text has a second source"
 	grep -qF 20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95 "$yml" \
 		&& ok "the LGPL-2.1 text is checked against gnu.org's sha256" || bad "the LGPL-2.1 text is checked against gnu.org's sha256"
 	grep -qE 'make -C src .*wg$' "$yml" && ok "builds only the wg target" || bad "builds only the wg target"
