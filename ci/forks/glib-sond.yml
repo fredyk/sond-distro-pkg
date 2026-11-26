@@ -1,0 +1,73 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the glib package (static libglib-2.0, libgthread-2.0, libgmodule-2.0 with headers and
+# pkg-config files, no program) from this fork's sond branch against the pinned musl and
+# publishes it to dist.sond.dev, its corresponding source first. It is a build input for a
+# static qemu (glib-2.0 >= 2.66, gthread-2.0, gmodule-no-export-2.0). pcre2 and libffi are
+# separate packages reached through `depends`; no meson wrap is downloaded at build time.
+# Generated from fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator (no push credential on this VM):
+#   secretd-github fork --name glib-sond https://github.com/GNOME/glib
+#   secretd-github branch-create --name sond --sha 3033f7862c2d3c7569cef2ad4b425cf42e95d4b4 fredyk/glib-sond
+# then this file pushed to that branch under .github/workflows/, and every file the fork adds
+# carries the Sond change notice (licence opinion, section 3).
+name: sond package glib
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: sudo apt-get install -y -qq --no-install-recommends meson ninja-build python3-packaging
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: glib
+          version: 2.86.5
+          license: LGPL-2.1-or-later
+          upstream: github.com/GNOME/glib@3033f7862c2d3c7569cef2ad4b425cf42e95d4b4
+          license-files: |
+            COPYING=share/licenses/glib/LGPL-2.1
+          depends: |
+            pcre2 10.47
+            libffi 3.5.2
+            linux-headers 6.12.77
+          build: |
+            # COPYING is the LGPL-2.1 text, checked byte for byte before anything ships.
+            printf '65986a89240f59896ce42a3779bbe5ed486a0bca7df636a8eef030fd2e1a0984  COPYING\n' | sha256sum -c -
+            # Option names from meson.options at the pinned commit. Everything that would pull a
+            # host library (selinux, libmount, libelf, sysprof), a tool (introspection, docs, man
+            # pages, dtrace/systemtap) or gettext is off; xattr goes through the C library anyway.
+            CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" \
+              meson setup build --prefix=/ --libdir=lib --buildtype=release \
+                --default-library=static --wrap-mode=nodownload \
+                -Dintrospection=disabled -Dtests=false -Ddocumentation=false \
+                -Dman-pages=disabled -Dnls=disabled -Dselinux=disabled -Dxattr=false \
+                -Dlibmount=disabled -Dsysprof=disabled -Dlibelf=disabled -Ddtrace=disabled \
+                -Dsystemtap=disabled
+            ninja -C build
+            DESTDIR="$SOND_PAYLOAD" meson install -C build --no-rebuild
+            # Library package: lib/*.a, include/ and lib/pkgconfig/ (plus glibconfig.h, which glib
+            # installs under lib/glib-2.0/include and glib-2.0.pc points at). No gdbus, gio tools,
+            # gdb scripts, gettext data or codegen helpers.
+            rm -rf "$SOND_PAYLOAD/bin" "$SOND_PAYLOAD/share" "$SOND_PAYLOAD/libexec"
+            for f in lib/pkgconfig/glib-2.0.pc lib/pkgconfig/gthread-2.0.pc \
+              lib/pkgconfig/gmodule-no-export-2.0.pc lib/glib-2.0/include/glibconfig.h \
+              lib/libglib-2.0.a lib/libgthread-2.0.a lib/libgmodule-2.0.a; do
+              test -f "$SOND_PAYLOAD/$f"
+            done
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
