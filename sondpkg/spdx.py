@@ -27,6 +27,8 @@ LICENSE_ATOMS = frozenset({
     "GPL-3.0-or-later",
     # rsync builds the zlib bundled in its tree (--with-included-zlib)
     "Zlib",
+    # edk2-ovmf: the OVMF UEFI firmware incus boots its VMs with (edk2's own licence)
+    "BSD-2-Clause-Patent",
 })
 # Identifiers a component linked into the package may use.
 BUNDLED_ATOMS = LICENSE_ATOMS | frozenset({

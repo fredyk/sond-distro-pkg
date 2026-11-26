@@ -64,6 +64,10 @@ class SpdxTest(unittest.TestCase):
         expression = "GPL-3.0-or-later AND LGPL-2.1-or-later AND Zlib AND MIT"
         spdx.check_license(expression)
         spdx.check_bundled("Zlib")
+    def test_edk2_firmware_is_admitted_as_a_package_without_the_source_lane(self):
+        # edk2-ovmf ships OVMF built from an edk2 stable tag: BSD-2-Clause-Patent, permissive.
+        spdx.check_license("BSD-2-Clause-Patent")
+        self.assertFalse(spdx.is_copyleft("BSD-2-Clause-Patent"))
 
     def test_the_c_libraries_incusd_links_are_admitted_as_packages(self):
         # the licence opinion's incusd table: each library is published as a package of its own,
