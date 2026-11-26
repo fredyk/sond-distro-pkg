@@ -22,6 +22,9 @@ _NOTICE_NAME = re.compile(r"^notice", re.IGNORECASE)
 _SIGNATURES = (
     ("Apache-2.0", ("apache license", "version 2.0")),
     ("MPL-2.0", ("mozilla public license version 2.0",)),
+    # HashiCorp's modules head the same text "Mozilla Public License, version 2.0".
+    ("MPL-2.0", ("mozilla public license, version 2.0", "1. definitions")),
+    ("CC0-1.0", ("creative commons legal code", "cc0 1.0 universal")),
     ("Unlicense", ("this is free and unencumbered software released into the public domain",)),
     ("MIT", ("permission is hereby granted, free of charge",)),
     ("ISC", ("permission to use, copy, modify, and/or distribute this software for any purpose "
@@ -34,7 +37,8 @@ _BSD_THIRD = ("neither the name", "may be used to endorse or promote")
 _BSD_BINARY = "redistributions in binary form must reproduce"
 # Texts the package rules ask for by name when a linked component is under them.
 _NAMED_TEXTS = ("MPL-2.0",)
-_ORDER = ("Apache-2.0", "MIT", "BSD-3-Clause", "BSD-2-Clause", "ISC", "Unlicense", "MPL-2.0")
+_ORDER = ("Apache-2.0", "MIT", "BSD-3-Clause", "BSD-2-Clause", "ISC", "Unlicense", "CC0-1.0",
+          "MPL-2.0", "LGPL-3.0-only")
 
 Reviewed = collections.namedtuple("Reviewed", "spdx ignore header_of reason")
 
@@ -53,6 +57,10 @@ REVIEWED = {
                  "LGPLv2.1 (no 'or later') plus an exception for static or dynamic linking without "
                  "Minimal Corresponding Source; the exception only adds permissions, so the "
                  "obligations of LGPL-2.1-only cover it (dictamen 2.10 (b))"),
+    ("rclone", "github.com/cloudsoda/sddl", "v0.0.0-20250224235906-926454e91efc"):
+        Reviewed("LGPL-3.0-only", (), None,
+                 "the README says MIT, the LICENSE file is the full LGPL-3.0 text with no 'or later' "
+                 "statement; the stricter reading is honoured, so rclone takes the source lane"),
     (None, "github.com/opencontainers/go-digest", "v1.0.0"):
         Reviewed("Apache-2.0", ("LICENSE.docs",), None,
                  "LICENSE.docs (CC-BY-SA-4.0) covers the documentation, not the code"),

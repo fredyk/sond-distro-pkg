@@ -4,7 +4,7 @@ import os
 import tempfile
 import unittest
 
-from sondpkg import golicences
+from sondpkg import golicences, spdx
 from sondpkg.errors import PackagerError
 from sondpkg.tests.helpers import run_cli, write_bytes
 
@@ -73,6 +73,19 @@ class ClassifyTest(unittest.TestCase):
             (MPL, "MPL-2.0"),
         ):
             self.assertEqual(golicences.classify(text), expected, expected)
+
+    def test_hashicorp_mpl_heading_with_a_comma_is_mpl(self):
+        # github.com/hashicorp/go-cleanhttp v0.5.2 and its siblings open with this heading.
+        text = "Copyright (c) 2015 HashiCorp, Inc.\n\nMozilla Public License, version 2.0\n\n1. Definitions\n"
+        self.assertEqual(golicences.classify(text), "MPL-2.0")
+
+    def test_cc0_is_recognised_and_admitted_when_linked(self):
+        # github.com/zeebo/blake3 v0.2.4: the Creative Commons CC0 1.0 Universal legal code.
+        text = ("This work is released into the public domain with CC0 1.0.\n\n"
+                "Creative Commons Legal Code\n\nCC0 1.0 Universal\n\n"
+                "CREATIVE COMMONS CORPORATION IS NOT A LAW FIRM\n")
+        self.assertEqual(golicences.classify(text), "CC0-1.0")
+        spdx.check_bundled("CC0-1.0")
 
     def test_an_unknown_text_is_not_guessed(self):
         self.assertIsNone(golicences.classify(CC_BY_SA))
@@ -288,6 +301,11 @@ class ReviewedTest(unittest.TestCase):
             "incusd", "github.com/lxc/go-lxc", "v0.0.0-20260316180011-3af4ce000ed7")
         self.assertEqual(entry.spdx, "LGPL-2.1-only")
         self.assertEqual(entry.ignore, ())
+
+    def test_sddl_is_lgpl_3_0_only_for_rclone(self):
+        entry = golicences.reviewed(
+            "rclone", "github.com/cloudsoda/sddl", "v0.0.0-20250224235906-926454e91efc")
+        self.assertEqual(entry.spdx, "LGPL-3.0-only")
 
     def test_a_new_version_needs_a_new_review(self):
         self.assertIsNone(

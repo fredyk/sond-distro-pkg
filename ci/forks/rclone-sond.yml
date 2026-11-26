@@ -1,9 +1,11 @@
+# Modified by the Sond project, 2026-11-26
 # Builds the rclone package from the official rclone v1.76.0 linux-amd64 release
 # zip: the build step downloads the zip, requires its pinned sha256 (the line for
 # that file in downloads.rclone.org/v1.76.0/SHA256SUMS), requires the same for the
 # ELF member inside, and installs it as bin/rclone. Nothing is compiled here; the
 # bundled licences come from the build info the binary carries itself (go version -m
-# and sondpkg go-licences, build.sh's Go side). Lives in the fork as
+# and sondpkg go-licences, build.sh's Go side). github.com/cloudsoda/sddl, linked in, ships the
+# LGPL-3.0 text, so the corresponding source publishes first (rclone-source). Lives in the fork as
 # .github/workflows/sond-package-rclone.yml. Generated from fredyk/sond-distro-pkg ci/forks.
 # Fork creation, for the operator (no push credential on this VM):
 #   secretd-github fork --name rclone-sond https://github.com/rclone/rclone
@@ -35,7 +37,7 @@ jobs:
         with:
           name: rclone
           version: 1.76.0
-          license: MIT
+          license: MIT AND LGPL-3.0-only
           upstream: github.com/rclone/rclone@e982ff36668f5130d94b4f70409babb3d964df42
           linkage: static Go 1.27.3, CGO_ENABLED=0
           license-files: |
@@ -59,5 +61,6 @@ jobs:
       - uses: fredyk/sond-publish-action@v1
         with:
           bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
           token: ${{ secrets.SOND_PUBLISH_TOKEN }}
           signing-key: ${{ secrets.SOND_SIGNING_KEY }}

@@ -39,7 +39,7 @@ unset _sourcing
 if grep -q '^FAIL' "$base_log"; then
 	bad "ci/test-fork-workflows.sh FAILs on the base recipes (see $base_log)"
 fi
-check rclone rclone "$RCLONE_VERSION" "$RCLONE_UPSTREAM"
+check rclone rclone "$RCLONE_VERSION" "$RCLONE_UPSTREAM" copyleft
 check fusermount3 fusermount3 "$FUSERMOUNT3_VERSION" "$FUSERMOUNT3_UPSTREAM" copyleft
 
 # The build step's with: block, same layout the workflows are generated with.
@@ -94,15 +94,20 @@ if [ -f "$yml" ]; then
 	grep -qF '$SOND_PAYLOAD/bin/rclone' "$yml" \
 		&& ok 'rclone-sond.yml: installs the member at $SOND_PAYLOAD/bin/rclone' \
 		|| bad 'rclone-sond.yml: installs the member at $SOND_PAYLOAD/bin/rclone'
-	! grep -q 'source-bundle:' "$yml" \
-		&& ok "rclone-sond.yml: an MIT binary takes no source lane" \
-		|| bad "rclone-sond.yml: an MIT binary takes no source lane"
+	# github.com/cloudsoda/sddl, linked into the release binary, ships the LGPL-3.0 text
+	# (sondpkg golicences.REVIEWED): the binary takes the source lane.
+	grep -q 'source-bundle:' "$yml" \
+		&& ok "rclone-sond.yml: publishes its corresponding source (an LGPL-3.0 module is linked)" \
+		|| bad "rclone-sond.yml: publishes its corresponding source (an LGPL-3.0 module is linked)"
 	l=$(field "$yml" license)
+	[ "$l" = "MIT AND LGPL-3.0-only" ] \
+		&& ok "rclone-sond.yml: license MIT AND LGPL-3.0-only" \
+		|| bad "rclone-sond.yml: license MIT AND LGPL-3.0-only (found: $l)"
 	rc=0
 	python3 "$DISTRO/sondpkg/bin/sondpkg" needs-source "$l" >/dev/null || rc=$?
-	[ "$rc" = 1 ] \
-		&& ok "sondpkg needs-source '$l' (rclone) is 1: not copyleft" \
-		|| bad "sondpkg needs-source '$l' (rclone) is 1: not copyleft (rc=$rc)"
+	[ "$rc" = 0 ] \
+		&& ok "sondpkg needs-source '$l' (rclone) is 0: the source lane publishes first" \
+		|| bad "sondpkg needs-source '$l' (rclone) is 0: the source lane publishes first (rc=$rc)"
 else
 	bad "rclone-sond.yml: present"
 fi
@@ -113,6 +118,10 @@ if [ -f "$yml" ]; then
 	grep -qF -- '-Ddisable-mtab=true' "$yml" \
 		&& ok "fusermount3-sond.yml: -Ddisable-mtab=true, so it always goes by mount(2) (no /etc/mtab needed)" \
 		|| bad "fusermount3-sond.yml: -Ddisable-mtab=true, so it always goes by mount(2) (no /etc/mtab needed)"
+	# ubuntu-24.04 runners carry neither meson nor ninja (run 45809854976: "meson: command not found")
+	awk '/sond-build-action/{exit} /apt-get install/ && /meson/ && /ninja-build/{f=1} END{exit !f}' "$yml" \
+		&& ok "fusermount3-sond.yml: installs meson and ninja-build before the build step" \
+		|| bad "fusermount3-sond.yml: installs meson and ninja-build before the build step"
 	grep -qF 'build/util/fusermount3' "$yml" \
 		&& ok "fusermount3-sond.yml: builds the util target and ships only bin/fusermount3" \
 		|| bad "fusermount3-sond.yml: builds the util target and ships only bin/fusermount3"
