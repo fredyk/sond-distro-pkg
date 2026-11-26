@@ -46,10 +46,15 @@ OBJECT_FETCH_ATTEMPTS = 3
 USER_AGENT = "sondpkg/1"
 
 
-def _request(method, url, body=None, headers=None, timeout=TIMEOUT_SECONDS):
-    """(status, body bytes); a transport failure is a PackagerError, an HTTP error status is not."""
+def _request(method, url, body=None, headers=None, timeout=TIMEOUT_SECONDS, unredirected=None):
+    """(status, body bytes); a transport failure is a PackagerError, an HTTP error status is not.
+
+    `unredirected` headers go on this request only: urllib never copies them onto a redirect.
+    """
     request = urllib.request.Request(url, data=body, method=method, headers=dict(headers or {}))
     request.add_header("User-Agent", USER_AGENT)
+    for header, value in (unredirected or {}).items():
+        request.add_unredirected_header(header, value)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.status, response.read()
@@ -179,24 +184,26 @@ def publish(bundle_dir, url, token_file, key_file, now=None):
     return (EXIT_PUBLISHED if status == 201 else EXIT_ALREADY_LOGGED), lines
 
 
-def _get(url, what):
-    status, body = _request("GET", url)
+def _get(url, what, unredirected=None):
+    status, body = _request("GET", url, unredirected=unredirected)
     if status != 200:
         raise PackagerError("%s: HTTP %d from %s" % (what, status, url))
     return body
 
 
-def _fetch_object(base, object_id):
+def _fetch_object(base, object_id, read_token=None):
     """The object's bytes, fetched again while they do not hash to its id.
 
     The registry is reached through proxies that re-chunk the body without Content-Length, so a
     body cut short arrives as a clean end of stream; the content address is the only check, and a
-    retry is safe because the bytes asked for never change.
+    retry is safe because the bytes asked for never change. `read_token` (a private tier) goes as
+    a bearer on this request alone, never onto a redirect.
     """
+    auth = {"Authorization": "Bearer " + read_token} if read_token else None
     failure = None
     for _ in range(OBJECT_FETCH_ATTEMPTS):
         try:
-            served = _get(base + "/o/" + object_id, "object")
+            served = _get(base + "/o/" + object_id, "object", auth)
         except PackagerError as error:
             failure = error
             continue
@@ -206,7 +213,7 @@ def _fetch_object(base, object_id):
     raise failure
 
 
-def _checked(base, name, version, log_key=None):
+def _checked(base, name, version, log_key=None, read_token=None):
     """The logged entry for name/version, its object and its inclusion, all checked.
 
     Returns (index, tree size, object id, object bytes). Raises PackagerError on the first thing
@@ -227,7 +234,7 @@ def _checked(base, name, version, log_key=None):
         raise PackagerError("the logged entry is for another name or version")
     object_id = entry["content"]
 
-    served = _fetch_object(base, object_id)
+    served = _fetch_object(base, object_id, read_token)
 
     key = log_key or _get(base + "/log/key", "log key").decode("ascii", "replace").strip()
     sth_text = _get(base + "/log/latest", "tree head")
@@ -308,10 +315,12 @@ def _install(tree, into):
             shutil.copy2(source, target)
 
 
-def fetch(name, version, url, log_key, into):
+def fetch(name, version, url, log_key, into, token_file=None):
     """Install the payload of a published package into the sysroot `into`, once its entry, object,
-    bundle and inclusion under the pinned log key all check out. Returns the result lines."""
-    index, size, object_id, served = _checked(_base(url), name, version, log_key)
+    bundle and inclusion under the pinned log key all check out. Returns the result lines.
+    `token_file` holds a read token, sent only on the object download (private tiers)."""
+    read_token = _read_token(token_file) if token_file else None
+    index, size, object_id, served = _checked(_base(url), name, version, log_key, read_token)
     with tempfile.TemporaryDirectory() as scratch:
         bundle_dir = os.path.join(scratch, "bundle")
         os.mkdir(bundle_dir)

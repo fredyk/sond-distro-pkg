@@ -43,8 +43,10 @@ class Stub:
                 answer = stub.routes.get((method, self.path), (404, b"not found\n"))
                 if isinstance(answer, list):  # answered in turn; the last one repeats
                     answer = answer.pop(0) if len(answer) > 1 else answer[0]
-                status, payload = answer
+                status, payload = answer[0], answer[1]
                 self.send_response(status)
+                for header, value in (answer[2] if len(answer) > 2 else {}).items():
+                    self.send_header(header, value)
                 self.send_header("Content-Length", str(len(payload)))
                 self.send_header("Connection", "close")
                 self.end_headers()
@@ -469,6 +471,59 @@ class FetchTest(VerifyPublishedTest):
         self.assertEqual(self.fetch()[0], 1)
         with open(target, "rb") as handle:
             self.assertEqual(handle.read(), b"another package's file\n")
+
+    def write_read_token(self, text="  read-secret-xyz \n"):
+        path = os.path.join(self.tmp.name, "read-token")
+        with open(path, "w") as handle:
+            handle.write(text)
+        return path
+
+    def auth_by_path(self):
+        return {path: headers.get("Authorization") for method, path, headers, body in self.stub.requests}
+
+    def test_without_a_token_file_no_authorization_is_sent(self):
+        self.assertEqual(self.fetch()[0], 0)
+        self.assertEqual(set(self.auth_by_path().values()), {None})
+
+    def test_the_read_token_goes_only_on_the_object_download(self):
+        rc, out, err = self.fetch("--token-file", self.write_read_token())
+        self.assertEqual(rc, 0, err)
+        for path, auth in self.auth_by_path().items():
+            if path.startswith("/o/"):
+                self.assertEqual(auth, "Bearer read-secret-xyz", path)
+            else:
+                self.assertIsNone(auth, path)
+
+    def test_the_read_token_never_follows_a_redirect_to_another_host(self):
+        other = Stub()
+        self.addCleanup(other.close)
+        path = "/o/" + self.object_id
+        other.routes[("GET", path)] = (200, self.object_bytes)
+        elsewhere = other.url.replace("127.0.0.1", "localhost") + path
+        self.stub.routes[("GET", path)] = (302, b"", {"Location": elsewhere})
+        rc, out, err = self.fetch("--token-file", self.write_read_token())
+        self.assertEqual(rc, 0, err)
+        self.assertTrue(other.requests)
+        for method, _, headers, body in other.requests:
+            self.assertNotIn("Authorization", headers)
+
+    def test_the_token_is_never_in_output_or_errors(self):
+        token_file = self.write_read_token()
+        self.stub.routes[("GET", "/o/" + self.object_id)] = (403, b"forbidden\n")
+        rc, out, err = self.fetch("--token-file", token_file)
+        self.assertEqual(rc, 1)
+        self.assertNotIn("read-secret-xyz", out + err)
+        try:
+            publish_module.fetch("toybox-static", "0.8.15", self.stub.url, ed25519.public_key(LOG_SEED).hex(),
+                                 os.path.join(self.tmp.name, "s2"), token_file=token_file)
+        except publish_module.PackagerError as error:
+            self.assertNotIn("read-secret-xyz", str(error) + repr(error.args))
+        else:
+            self.fail("a 403 on the object must fail the fetch")
+
+    def test_an_empty_token_file_is_refused(self):
+        rc, out, err = self.fetch("--token-file", self.write_read_token("\n"))
+        self.assertEqual(rc, 1)
 
     def test_fetching_the_same_package_twice_is_harmless(self):
         self.assertEqual(self.fetch()[0], 0)

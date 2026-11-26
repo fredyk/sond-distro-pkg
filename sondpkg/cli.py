@@ -94,7 +94,7 @@ def _cmd_verify_published(args):
 
 
 def _cmd_fetch(args):
-    for line in publish.fetch(args.name, args.version, args.url, args.log_key, args.into):
+    for line in publish.fetch(args.name, args.version, args.url, args.log_key, args.into, args.token_file):
         print(line)
     return 0
 
@@ -238,6 +238,9 @@ def build_parser():
     child.add_argument("--url", required=True)
     child.add_argument("--log-key", required=True, help="the log public key (64 hex digits)")
     child.add_argument("--into", required=True, help="the sysroot; created when missing")
+    child.add_argument(
+        "--token-file", help="a read token for private tiers, sent only on the object download"
+    )
     child.set_defaults(func=_cmd_fetch)
 
     child = subparsers.add_parser("object-id", help="print the object id (sha256:<hex>) of a bundle")
