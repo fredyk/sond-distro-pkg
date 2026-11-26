@@ -136,6 +136,15 @@ if [ -f "$yml" ]; then
 	grep -qF 'build/util/fusermount3' "$yml" \
 		&& ok "fusermount3-sond.yml: builds the util target and ships only bin/fusermount3" \
 		|| bad "fusermount3-sond.yml: builds the util target and ships only bin/fusermount3"
+	# libfuse has no COPYING (run 45812745400): LICENSE says util/ is GPL-2.0 and lib/ (mount_util.c,
+	# linked into the helper) LGPL-2.1, with the texts in GPL2.txt and LGPL2.txt.
+	[ "$(field "$yml" license)" = "GPL-2.0-only AND LGPL-2.1-only" ] \
+		&& ok "fusermount3-sond.yml: license GPL-2.0-only AND LGPL-2.1-only" \
+		|| bad "fusermount3-sond.yml: license GPL-2.0-only AND LGPL-2.1-only (found: $(field "$yml" license))"
+	awk '/license-files:/{f=1;next} f&&/^ *[a-z-]+:/{exit} f{print $1}' "$yml" | sort | tr '\n' ' ' \
+		| grep -qx 'GPL2.txt=share/licenses/fusermount3/GPL-2.0 LGPL2.txt=share/licenses/fusermount3/LGPL-2.1 LICENSE ' \
+		&& ok "fusermount3-sond.yml: ships LICENSE, GPL2.txt and LGPL2.txt" \
+		|| bad "fusermount3-sond.yml: ships LICENSE, GPL2.txt and LGPL2.txt"
 	l=$(field "$yml" license)
 	rc=0
 	python3 "$DISTRO/sondpkg/bin/sondpkg" needs-source "$l" >/dev/null || rc=$?

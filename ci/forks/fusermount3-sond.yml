@@ -32,10 +32,12 @@ jobs:
         with:
           name: fusermount3
           version: 3.16.2
-          license: GPL-2.0-only
+          license: GPL-2.0-only AND LGPL-2.1-only
           upstream: github.com/libfuse/libfuse@7a92727d97c10290b3501d86a194738973edb61d
           license-files: |
-            COPYING
+            LICENSE
+            GPL2.txt=share/licenses/fusermount3/GPL-2.0
+            LGPL2.txt=share/licenses/fusermount3/LGPL-2.1
           build: |
             # disable-mtab defines IGNORE_MTAB, which folds mtab_needs_update() to a constant 0
             # (lib/mount_util.c:40-41): the helper always goes straight to the mount(2)/umount2()
