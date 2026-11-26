@@ -51,6 +51,14 @@ class SpdxTest(unittest.TestCase):
         spdx.check_license("MPL-2.0")
         self.assertTrue(spdx.is_copyleft("MPL-2.0"))
 
+    def test_rsync_is_admitted_as_a_package_and_takes_the_source_lane(self):
+        # rsync (incusd receives dir volumes with it) is GPL-3.0-or-later, its COPYING the GPLv3.
+        spdx.check_license("GPL-3.0-or-later")
+        self.assertTrue(spdx.is_copyleft("GPL-3.0-or-later"))
+        # only the "or later" grant is admitted: GPL-3.0-only stays out
+        with self.assertRaises(PackagerError):
+            spdx.check_license("GPL-3.0-only")
+
     def test_the_c_libraries_incusd_links_are_admitted_as_packages(self):
         # the licence opinion's incusd table: each library is published as a package of its own,
         # under the licence it carries when linked
