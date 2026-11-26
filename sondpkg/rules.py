@@ -31,7 +31,11 @@ COMPUTED_LICENSE = {"linux-headers": lambda payload: linuxheaders.computed_licen
 # Licences whose notice must travel verbatim with every copy: the package ships
 # the upstream file that carries it, under share/licenses/<name>/.
 NOTICE_FILES = {"X11-distribute-modifications-variant": "COPYING"}
-ALLOWED_TIERS = ("public",)
+# public: open licences, objects anyone may fetch. private: proprietary code (one licence,
+# LicenseRef-Proprietary), still signed into the log under TOFU, whose objects the registry
+# serves only to a read token.
+ALLOWED_TIERS = ("public", "private")
+PROPRIETARY_LICENSE = "LicenseRef-Proprietary"
 
 _COMMIT_RE = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
 
@@ -45,16 +49,27 @@ def validate_metadata(name, version, license, source, upstream, linkage, tier):
         raise PackagerError(
             "license is empty: expected one of " + ", ".join(ALLOWED_LICENSES)
         )
-    try:
-        spdx.check_license(license)
-    except PackagerError as error:
-        raise PackagerError(
-            "%s: allowed identifiers are %s" % (error, ", ".join(ALLOWED_LICENSES))
-        ) from error
     if tier not in ALLOWED_TIERS:
         raise PackagerError(
-            'unsupported tier "%s": only "public" is defined' % tier
+            'unsupported tier "%s": defined tiers are %s' % (tier, ", ".join(ALLOWED_TIERS))
         )
+    if tier == "private":
+        if license != PROPRIETARY_LICENSE:
+            raise PackagerError(
+                'tier "private" takes only license %s, got "%s": an open licence is public'
+                % (PROPRIETARY_LICENSE, license)
+            )
+    elif license == PROPRIETARY_LICENSE:
+        raise PackagerError(
+            '%s is not an open licence: publish it with tier "private"' % PROPRIETARY_LICENSE
+        )
+    else:
+        try:
+            spdx.check_license(license)
+        except PackagerError as error:
+            raise PackagerError(
+                "%s: allowed identifiers are %s" % (error, ", ".join(ALLOWED_LICENSES))
+            ) from error
     if not _COMMIT_RE.match(source or ""):
         raise PackagerError(
             'source must be <repo>@<40-hex commit>, got: "%s"' % source
