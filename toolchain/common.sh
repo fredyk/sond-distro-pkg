@@ -139,6 +139,19 @@ LXC_VERSION=7.0.0-sond2 # -sond1: no LTO (7.0.0 held bytecode for one gcc only);
 LXC_TAG=v7.0.0
 LXC_COMMIT=e4415af07e3ec291205bc828e2b4e8141f91a499
 
+# docker is the one package that ships prebuilt binaries: its payload is Docker's own
+# official static build of 29.10.1, verified by sha256 inside the recipe, not compiled
+# here. The fork tag resolves to the pinned engine commit; the tarball's docker binary
+# was built from github.com/docker/cli v29.10.1 (c48360f51c53d2029ab6721ad4d012f9e14df846),
+# recorded in ci/forks/docker-sond.yml and docs/docker-package.md.
+DOCKER_URL=https://github.com/fredyk/docker-sond
+DOCKER_UPSTREAM=https://github.com/moby/moby
+DOCKER_TAG=docker-v29.10.1
+DOCKER_COMMIT=54cd494d0b39abfc7a958fcc876f706271f8b909
+DOCKER_VERSION=29.10.1
+DOCKER_STATIC_URL=https://download.docker.com/linux/static/stable/x86_64/docker-29.10.1.tgz
+DOCKER_STATIC_SHA256=061642059fa7f2ed9b2f04a327a951cff4249585cf04b2661c2a6539197c9962
+
 # ---------------------------------------------------------------------------
 # Reproducibility (RFC-0018): two clean builds, same bytes.
 # ---------------------------------------------------------------------------

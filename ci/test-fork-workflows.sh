@@ -77,6 +77,25 @@ check libcap libcap "$LIBCAP_VERSION" "git.kernel.org/pub/scm/libs/libcap/libcap
 check acl acl "${ACL_TAG#v}" "git.savannah.gnu.org/r/acl@$ACL_COMMIT" copyleft
 check libseccomp libseccomp "${LIBSECCOMP_TAG#v}" "github.com/seccomp/libseccomp@$LIBSECCOMP_COMMIT" copyleft
 check lxc lxc "$LXC_VERSION" "github.com/lxc/lxc@$LXC_COMMIT" copyleft
+check docker docker "$DOCKER_VERSION" "github.com/moby/moby@$DOCKER_COMMIT" marked
+
+# The docker recipe unpacks an artifact instead of compiling it: what it verifies at build
+# time has to be the pin this file declares, or the pin in toolchain/common.sh is
+# documentation only.
+if [ -n "${DOCKER_STATIC_URL:-}" ] && grep -qF "$DOCKER_STATIC_URL" "$here/forks/docker-sond.yml"; then
+	ok "docker: the workflow downloads the pinned static build"
+else
+	bad "docker: the workflow downloads the pinned static build"
+fi
+if [ -n "${DOCKER_STATIC_SHA256:-}" ] && grep -qF "$DOCKER_STATIC_SHA256" "$here/forks/docker-sond.yml"; then
+	ok "docker: the workflow verifies the pinned sha256 at build time"
+else
+	bad "docker: the workflow verifies the pinned sha256 at build time"
+fi
+case ${DOCKER_STATIC_URL:-} in
+*"${DOCKER_VERSION:-}".tgz) ok "docker: the pinned static build is for $DOCKER_VERSION" ;;
+*) bad "docker: the pinned static build is for ${DOCKER_VERSION:-<unset DOCKER_VERSION>} (got ${DOCKER_STATIC_URL:-unset})" ;;
+esac
 
 if [ "$fails" -eq 0 ]; then
 	printf 'test-fork-workflows: OK\n'

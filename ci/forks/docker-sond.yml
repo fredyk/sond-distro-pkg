@@ -1,0 +1,86 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the docker package (the eight binaries of Docker's official static build of
+# 29.10.1, unpacked unchanged: this recipe compiles and links nothing) from this fork's
+# sond branch and publishes it to dist.sond.dev. Lives in the fork as
+# .github/workflows/sond-package-docker.yml. Generated from fredyk/sond-distro-pkg
+# ci/forks.
+# The engine is github.com/moby/moby tag docker-v29.10.1
+# (54cd494d0b39abfc7a958fcc876f706271f8b909); the docker binary is github.com/docker/cli
+# tag v29.10.1 (c48360f51c53d2029ab6721ad4d012f9e14df846). The other components of the
+# payload are containerd v2.4.2 (b7a25261e029d68978bbf290df0a62fc819b3c51), runc v1.5.3
+# (46365c62967c76a765a5e347f48f0c7b3b571fe9) and tini v0.19.0 (docker-init,
+# de40ad007797e0dcd8b7126f27bb87401d224240), each read from its own commit below.
+name: sond package docker
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: docker
+          version: 29.10.1
+          license: Apache-2.0 AND MIT
+          upstream: github.com/moby/moby@54cd494d0b39abfc7a958fcc876f706271f8b909
+          # Prebuilt binaries: nothing here is compiled or linked, and which libc the
+          # official build used cannot be proved from this recipe, so the linkage names
+          # neither a libc nor a toolchain.
+          linkage: static prebuilt binaries from the official docker-29.10.1 static tarball
+          license-files: |
+            LICENSE=share/licenses/docker/COPYING
+            NOTICE=share/licenses/docker/NOTICE
+            .sond-licences/docker-cli/LICENSE=share/licenses/docker/docker-cli-LICENSE
+            .sond-licences/docker-cli/NOTICE=share/licenses/docker/docker-cli-NOTICE
+            .sond-licences/containerd/LICENSE=share/licenses/docker/containerd-LICENSE
+            .sond-licences/containerd/NOTICE=share/licenses/docker/containerd-NOTICE
+            .sond-licences/runc/LICENSE=share/licenses/docker/runc-LICENSE
+            .sond-licences/runc/NOTICE=share/licenses/docker/runc-NOTICE
+            .sond-licences/tini/LICENSE=share/licenses/docker/tini-LICENSE
+          build: |
+            # Docker's own bytes: the pin is verified at build time and nothing is
+            # stripped, patched or rewritten, so the payload hash describes what
+            # download.docker.com published for 29.10.1.
+            curl -fsSLO https://download.docker.com/linux/static/stable/x86_64/docker-29.10.1.tgz
+            sha256sum -c <<<"061642059fa7f2ed9b2f04a327a951cff4249585cf04b2661c2a6539197c9962  docker-29.10.1.tgz"
+            tar -xzf docker-29.10.1.tgz
+            mkdir -p "$SOND_PAYLOAD/bin"
+            install -m 0755 docker/dockerd docker/docker docker/containerd \
+              docker/containerd-shim-runc-v2 docker/runc docker/docker-proxy \
+              docker/docker-init docker/ctr "$SOND_PAYLOAD/bin"
+            # The licence texts this package ships, each read from the commit that carries
+            # it. build.sh takes them from the fork tree, and this fork is moby plus the
+            # workflow file, so the engine's own two come from the checkout and the four
+            # other components are fetched here from commit-scoped URLs (immutable).
+            for f in LICENSE NOTICE; do
+              if [ ! -f "$f" ]; then printf 'docker recipe: %s missing from the fork\n' "$f" >&2; exit 1; fi
+            done
+            mkdir -p .sond-licences/docker-cli .sond-licences/containerd \
+              .sond-licences/runc .sond-licences/tini
+            raw=https://raw.githubusercontent.com
+            curl -fsSL "$raw/docker/cli/c48360f51c53d2029ab6721ad4d012f9e14df846/LICENSE" -o .sond-licences/docker-cli/LICENSE
+            curl -fsSL "$raw/docker/cli/c48360f51c53d2029ab6721ad4d012f9e14df846/NOTICE" -o .sond-licences/docker-cli/NOTICE
+            curl -fsSL "$raw/containerd/containerd/b7a25261e029d68978bbf290df0a62fc819b3c51/LICENSE" -o .sond-licences/containerd/LICENSE
+            curl -fsSL "$raw/containerd/containerd/b7a25261e029d68978bbf290df0a62fc819b3c51/NOTICE" -o .sond-licences/containerd/NOTICE
+            curl -fsSL "$raw/opencontainers/runc/46365c62967c76a765a5e347f48f0c7b3b571fe9/LICENSE" -o .sond-licences/runc/LICENSE
+            curl -fsSL "$raw/opencontainers/runc/46365c62967c76a765a5e347f48f0c7b3b571fe9/NOTICE" -o .sond-licences/runc/NOTICE
+            curl -fsSL "$raw/krallin/tini/de40ad007797e0dcd8b7126f27bb87401d224240/LICENSE" -o .sond-licences/tini/LICENSE
+            for f in .sond-licences/*/*; do
+              if [ ! -s "$f" ]; then printf 'docker recipe: %s is empty\n' "$f" >&2; exit 1; fi
+            done
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
