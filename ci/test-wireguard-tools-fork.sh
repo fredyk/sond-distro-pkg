@@ -67,9 +67,9 @@ if [ -f "$yml" ]; then
 	grep -qE '^ +linux-headers 6\.12\.77$' "$yml" && ok "depends on linux-headers 6.12.77" || bad "depends on linux-headers 6.12.77"
 	# The bundled uapi must win over linux-headers 6.12 (no WGALLOWEDIP_A_FLAGS there).
 	grep -qF 'CFLAGS="-isystem uapi/linux $SOND_CFLAGS' "$yml" && ok "bundled uapi first" || bad "bundled uapi first"
-	# -MD in CPPFLAGS: build.sh reads the dependency files to know which linux-headers notices
-	# ship, and the Makefile's own -MMD (which drops system headers) comes before CPPFLAGS.
-	grep -qF 'CPPFLAGS="-MD"' "$yml" && ok "dependency files list the kernel headers" || bad "dependency files list the kernel headers"
+	# build.sh reads .d files to know which linux-headers notices ship; the Makefile's -MMD leaves
+	# system headers out, so a -M pass through $SOND_CC writes complete ones.
+	grep -qF -- '-M -MF "${c%.c}.sond.d"' "$yml" && ok "dependency files list the kernel headers" || bad "dependency files list the kernel headers"
 	grep -qF 20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95 "$yml" \
 		&& ok "the LGPL-2.1 text is checked against gnu.org's sha256" || bad "the LGPL-2.1 text is checked against gnu.org's sha256"
 	grep -qE 'make -C src .*wg$' "$yml" && ok "builds only the wg target" || bad "builds only the wg target"
