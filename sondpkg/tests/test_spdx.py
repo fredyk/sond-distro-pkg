@@ -59,6 +59,12 @@ class SpdxTest(unittest.TestCase):
         with self.assertRaises(PackagerError):
             spdx.check_license("GPL-3.0-only")
 
+    def test_rsyncs_bundled_zlib_is_admitted_in_its_licence_expression(self):
+        # rsync links the zlib and popt in its own tree and libacl/libattr statically.
+        expression = "GPL-3.0-or-later AND LGPL-2.1-or-later AND Zlib AND MIT"
+        spdx.check_license(expression)
+        spdx.check_bundled("Zlib")
+
     def test_the_c_libraries_incusd_links_are_admitted_as_packages(self):
         # the licence opinion's incusd table: each library is published as a package of its own,
         # under the licence it carries when linked

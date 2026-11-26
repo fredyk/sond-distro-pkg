@@ -1,7 +1,7 @@
 #!/bin/bash
 # Shape checks for the rsync fork recipe: the rsync command alone (incusd needs it on PATH at
-# startup and receives dir volumes with it), static against the pinned musl, GPL-3.0-or-later
-# with its COPYING and its source lane, ACLs and xattrs in, md2man and optional libraries out. Every rule
+# startup and receives dir volumes with it), static against the pinned musl, GPL-3.0-or-later AND LGPL-2.1-or-later
+# AND Zlib AND MIT with its COPYING and the LGPL-2.1 text and its source lane, ACLs and xattrs in, md2man and optional libraries out. Every rule
 # ci/test-fork-workflows.sh applies to the other recipes applies here.
 # Offline: no network, no build.
 #
@@ -59,8 +59,13 @@ PY
 
 if [ -f "$yml" ]; then
 	l=$(field license)
-	# COPYING at the tag is the GPLv3 text; every source file grants "version 3 or later".
-	[ "$l" = "GPL-3.0-or-later" ] && ok "license GPL-3.0-or-later" || bad "license GPL-3.0-or-later (found: $l)"
+	# COPYING at the tag is the GPLv3 text; every source file grants "version 3 or later". The
+	# binary also carries libacl/libattr linked statically (LGPL-2.1-or-later), and the zlib (Zlib)
+	# and popt (MIT) rsync builds from its own tree (--with-included-zlib, --with-included-popt).
+	want="GPL-3.0-or-later AND LGPL-2.1-or-later AND Zlib AND MIT"
+	[ "$l" = "$want" ] && ok "license $want" || bad "license $want (found: $l)"
+	grep -qF 'share/licenses/rsync/LGPL-2.1' "$yml" && ok "ships the LGPL-2.1 text for the static libacl" \
+		|| bad "ships the LGPL-2.1 text for the static libacl"
 	grep -qF -- '--disable-md2man' "$yml" && ok "md2man is disabled" || bad "md2man is disabled"
 	for o in openssl xxhash zstd lz4; do
 		grep -qF -- "--disable-$o" "$yml" && ok "$o is disabled (incus never asks for it)" \
