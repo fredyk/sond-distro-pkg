@@ -1,0 +1,54 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the wireguard-tools package (the wg command, which configures the kernel's WireGuard
+# devices over netlink) from this fork's sond branch, static against the pinned musl, and
+# publishes it, its corresponding source first, to dist.sond.dev. Only bin/wg ships: wg-quick
+# needs bash and ip, and neither the bash completion nor the systemd units have a use on the box.
+# Lives in the fork as .github/workflows/sond-package-wireguard-tools.yml. Generated from
+# fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator:
+#   secretd-github fork --name wireguard-tools-sond https://github.com/WireGuard/wireguard-tools
+#   secretd-github branch-create --name sond --sha 49ce333da02056ae7b22ee2aeb6afe8aaed79b19 fredyk/wireguard-tools-sond
+# then this file pushed to that branch under .github/workflows/.
+name: sond package wireguard-tools
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: wireguard-tools
+          version: 1.0.20260223
+          license: GPL-2.0-only AND LGPL-2.1-or-later AND MIT
+          upstream: github.com/WireGuard/wireguard-tools@49ce333da02056ae7b22ee2aeb6afe8aaed79b19
+          license-files: |
+            COPYING
+            .sond-licences/LGPL-2.1=share/licenses/wireguard-tools/LGPL-2.1
+          build: |
+            # CFLAGS and LDFLAGS through the environment: on the command line they would override
+            # the Makefile's own "CFLAGS +=" (-isystem uapi/linux, -std=gnu99, -D_GNU_SOURCE).
+            CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" make -C src wg
+            install -D -m 0755 src/wg "$SOND_PAYLOAD/bin/wg"
+            # The .c files are GPL-2.0 OR MIT (GPL elected), ipc-linux.h and ipc-uapi*.h MIT, and
+            # netlink.h, a minimized libmnl, LGPL-2.1+: its text, byte for byte gnu.org's.
+            mkdir -p .sond-licences
+            curl -fsSL --retry 3 -o .sond-licences/LGPL-2.1 https://www.gnu.org/licenses/lgpl-2.1.txt
+            printf '20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95  .sond-licences/LGPL-2.1\n' | sha256sum -c -
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
