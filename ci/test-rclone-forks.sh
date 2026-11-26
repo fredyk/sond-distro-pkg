@@ -99,6 +99,13 @@ if [ -f "$yml" ]; then
 	grep -q 'source-bundle:' "$yml" \
 		&& ok "rclone-sond.yml: publishes its corresponding source (an LGPL-3.0 module is linked)" \
 		|| bad "rclone-sond.yml: publishes its corresponding source (an LGPL-3.0 module is linked)"
+	# LGPL-3.0 obliges its text and the GPL-3.0 it builds on (sondpkg rules._BUNDLED_TEXTS)
+	grep -qE '^ +\S+=share/licenses/rclone/LGPL-3\.0$' "$yml" && grep -qE '^ +\S+=share/licenses/rclone/GPL-3\.0$' "$yml" \
+		&& ok "rclone-sond.yml: ships the LGPL-3.0 and GPL-3.0 texts" \
+		|| bad "rclone-sond.yml: ships the LGPL-3.0 and GPL-3.0 texts"
+	grep -qF 3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986 "$yml" && grep -qF e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118 "$yml" \
+		&& ok "rclone-sond.yml: both texts are checked against the official gnu.org sha256" \
+		|| bad "rclone-sond.yml: both texts are checked against the official gnu.org sha256"
 	l=$(field "$yml" license)
 	[ "$l" = "MIT AND LGPL-3.0-only" ] \
 		&& ok "rclone-sond.yml: license MIT AND LGPL-3.0-only" \
@@ -122,6 +129,10 @@ if [ -f "$yml" ]; then
 	awk '/sond-build-action/{exit} /apt-get install/ && /meson/ && /ninja-build/{f=1} END{exit !f}' "$yml" \
 		&& ok "fusermount3-sond.yml: installs meson and ninja-build before the build step" \
 		|| bad "fusermount3-sond.yml: installs meson and ninja-build before the build step"
+	# meson names an executable of a subdirectory by its path (run 45811890786: unknown target 'fusermount3')
+	grep -qE 'ninja -C build util/fusermount3$' "$yml" \
+		&& ok "fusermount3-sond.yml: asks ninja for the target util/fusermount3" \
+		|| bad "fusermount3-sond.yml: asks ninja for the target util/fusermount3"
 	grep -qF 'build/util/fusermount3' "$yml" \
 		&& ok "fusermount3-sond.yml: builds the util target and ships only bin/fusermount3" \
 		|| bad "fusermount3-sond.yml: builds the util target and ships only bin/fusermount3"

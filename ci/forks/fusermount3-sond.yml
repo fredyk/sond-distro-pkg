@@ -47,7 +47,7 @@ jobs:
             CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" \
               meson setup build --prefix=/ --libdir=lib --buildtype=release \
                 --default-library=static -Ddisable-mtab=true -Dexamples=false -Dtests=false
-            ninja -C build fusermount3
+            ninja -C build util/fusermount3
             install -D -m 0755 build/util/fusermount3 "$SOND_PAYLOAD/bin/fusermount3"
       - uses: fredyk/sond-publish-action@v1
         with:
