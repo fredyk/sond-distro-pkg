@@ -38,7 +38,7 @@ jobs:
           license-files: |
             COPYING=share/licenses/glib/LGPL-2.1
           depends: |
-            pcre2 10.47
+            pcre2 10.49
             libffi 3.5.2
             linux-headers 6.12.77
           build: |

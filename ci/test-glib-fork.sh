@@ -58,7 +58,7 @@ if [ -f "$yml" ]; then
 	done
 	has 'lib/glib-2\.0/include' && ok "keeps glibconfig.h (lib/glib-2.0/include)" \
 		|| bad "keeps glibconfig.h (lib/glib-2.0/include)"
-	has '\.so' && bad "no shared object referenced" || ok "no shared object referenced"
+	has '\.so([^a-z_]|$)' && bad "no shared object referenced" || ok "no shared object referenced"
 else
 	bad "glib-sond.yml: present"
 fi
