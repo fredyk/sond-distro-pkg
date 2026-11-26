@@ -35,7 +35,7 @@ BUNDLED_ATOMS = LICENSE_ATOMS | frozenset({
     # public-domain dedication (github.com/zeebo/blake3, linked by rclone)
     "CC0-1.0",
 })
-EXCEPTIONS = frozenset({"LGPL-3.0-linking-exception", "Linux-syscall-note"})
+EXCEPTIONS = frozenset({"LGPL-3.0-linking-exception", "Linux-syscall-note", "PCRE2-exception"})
 _COPYLEFT = re.compile(r"^(GPL|LGPL|MPL)-")
 _TOKEN = re.compile(r"\(|\)|[A-Za-z0-9.+-]+")
 
