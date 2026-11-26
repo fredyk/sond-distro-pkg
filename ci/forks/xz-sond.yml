@@ -1,0 +1,51 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the xz package (the xz command: incusd looks it up on PATH at startup and refuses to
+# run without it, cmd/incusd/main_daemon.go) from this fork's sond branch, static against the
+# pinned musl, and publishes it to dist.sond.dev. Only bin/xz ships: xz and liblzma are 0BSD;
+# GNU getopt_long is not compiled in because musl has a usable one; the GPL-2.0 scripts (xzgrep,
+# xzdiff, xzless, xzmore) are not built. Lives in the fork as
+# .github/workflows/sond-package-xz.yml. Generated from fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator:
+#   secretd-github fork --name xz-sond https://github.com/tukaani-project/xz
+#   secretd-github branch-create --name sond --sha d3e650e63c110e830fd5391e7f8b45df0b91d3da fredyk/xz-sond
+# then this file pushed to that branch under .github/workflows/.
+name: sond package xz
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: xz
+          version: 5.8.4
+          license: 0BSD
+          upstream: github.com/tukaani-project/xz@d3e650e63c110e830fd5391e7f8b45df0b91d3da
+          license-files: |
+            COPYING
+            COPYING.0BSD
+          build: |
+            CC="$SOND_CC" cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_FLAGS="$SOND_CFLAGS" -DCMAKE_EXE_LINKER_FLAGS="$SOND_LDFLAGS -static" \
+              -DBUILD_SHARED_LIBS=OFF -DXZ_NLS=OFF -DXZ_DOC=OFF -DXZ_TOOL_SCRIPTS=OFF \
+              -DXZ_TOOL_XZDEC=OFF -DXZ_TOOL_LZMADEC=OFF -DXZ_TOOL_LZMAINFO=OFF -DXZ_TOOL_SYMLINKS=OFF \
+              -DXZ_TOOL_SYMLINKS_LZMA=OFF
+            cmake --build build --target xz -j "$(nproc)"
+            install -D -m 0755 build/xz "$SOND_PAYLOAD/bin/xz"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
