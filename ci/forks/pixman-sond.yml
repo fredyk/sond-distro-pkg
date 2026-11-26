@@ -1,0 +1,57 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the pixman package (a static library for a static musl qemu) from this fork's sond
+# branch against the pinned musl and publishes it to dist.sond.dev. Ships lib/libpixman-1.a,
+# include/pixman-1/ and lib/pkgconfig/pixman-1.pc only: no shared object, tests or demos.
+# pixman is under the MIT licence (COPYING). Lives in the fork as
+# .github/workflows/sond-package-pixman.yml. Generated from fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator:
+#   secretd-github fork --name pixman-sond https://gitlab.freedesktop.org/pixman/pixman
+#   secretd-github branch-create --name sond --sha 9cc163c9da0fb4da430641715313d95a6ec466d9 fredyk/pixman-sond
+# then this file pushed to that branch under .github/workflows/.
+name: sond package pixman
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: sudo apt-get install -y -qq --no-install-recommends meson ninja-build
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: pixman
+          version: 0.46.4
+          license: MIT
+          upstream: gitlab.freedesktop.org/pixman/pixman@9cc163c9da0fb4da430641715313d95a6ec466d9
+          license-files: |
+            COPYING
+          build: |
+            # Options from meson.options at pixman-0.46.4. The optional dependencies (gtk, libpng,
+            # openmp) are disabled so nothing from the runner leaks into libpixman-1.a or its .pc;
+            # the SIMD back ends stay at their auto default and are chosen at run time.
+            CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" \
+              meson setup build --prefix=/ --libdir=lib --includedir=include --buildtype=release \
+                --default-library=static -Dtests=disabled -Ddemos=disabled -Dgtk=disabled \
+                -Dlibpng=disabled -Dopenmp=disabled -Dtimers=false -Dgnuplot=false
+            ninja -C build
+            meson install -C build --destdir "$SOND_PAYLOAD"
+            test -f "$SOND_PAYLOAD/lib/libpixman-1.a"
+            test -f "$SOND_PAYLOAD/include/pixman-1/pixman.h"
+            test -f "$SOND_PAYLOAD/lib/pkgconfig/pixman-1.pc"
+            test -z "$(find "$SOND_PAYLOAD" -type f ! -name '*.a' ! -name '*.h' ! -name '*.pc')"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
