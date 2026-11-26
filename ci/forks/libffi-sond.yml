@@ -1,0 +1,53 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the libffi package (a static library, no program: glib's gobject links it) from this
+# fork's sond branch against the pinned musl and publishes it to dist.sond.dev. Ships
+# lib/libffi.a, include/ffi.h, include/ffitarget.h and lib/pkgconfig/libffi.pc; no man pages,
+# no info manual. Built from the git checkout through autogen.sh (autoreconf, as libuv and
+# libseccomp do on the same runner) rather than the release tarball, so the source that is
+# built is the commit named in upstream:, the fork's own history. Lives in the fork as
+# .github/workflows/sond-package-libffi.yml. Generated from fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator:
+#   secretd-github fork --name libffi-sond https://github.com/libffi/libffi
+#   secretd-github branch-create --name sond --sha e2eda0cf72a0598b44278cc91860ea402273fa29 fredyk/libffi-sond
+# then this file pushed to that branch under .github/workflows/.
+name: sond package libffi
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: sudo apt-get install -y -qq --no-install-recommends autoconf automake libtool
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: libffi
+          version: 3.5.2
+          license: MIT
+          upstream: github.com/libffi/libffi@e2eda0cf72a0598b44278cc91860ea402273fa29
+          license-files: |
+            LICENSE
+          build: |
+            ./autogen.sh
+            ./configure --prefix=/ --disable-shared --enable-static --disable-docs \
+              --disable-multi-os-directory \
+              CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static"
+            make -j"$(nproc)" libffi.la
+            make DESTDIR="$SOND_PAYLOAD" install-toolexeclibLTLIBRARIES install-pkgconfigDATA
+            make -C include DESTDIR="$SOND_PAYLOAD" install-nodist_includeHEADERS
+            rm -f "$SOND_PAYLOAD"/lib/*.la
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
