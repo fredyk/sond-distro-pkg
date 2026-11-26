@@ -42,7 +42,7 @@ jobs:
             # CFLAGS and LDFLAGS through the environment: on the command line they would override
             # the Makefile's own "CFLAGS +=" (-isystem uapi/linux, -std=gnu99, -D_GNU_SOURCE).
             # The bundled uapi goes first too: linux-headers 6.12 has an older wireguard.h.
-            CC="$SOND_CC" CFLAGS="-isystem uapi/linux $SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" make -C src wg
+            CC="$SOND_CC" CFLAGS="-isystem uapi/linux $SOND_CFLAGS -MD" LDFLAGS="$SOND_LDFLAGS -static" make -C src wg
             install -D -m 0755 src/wg "$SOND_PAYLOAD/bin/wg"
             # The .c files are GPL-2.0 OR MIT (GPL elected), ipc-linux.h and ipc-uapi*.h MIT, and
             # netlink.h, a minimized libmnl, LGPL-2.1+: its text, byte for byte gnu.org's.
