@@ -1,7 +1,7 @@
 # Modified by the Sond project, 2026-11-26
 # Builds the zlib package (a static library for a static musl qemu) from this fork's sond
 # branch against the pinned musl and publishes it to dist.sond.dev. Ships lib/libz.a, the two
-# public headers and lib/pkgconfig/zlib.pc only: no shared object, no zlib.3 man page, no
+# public headers and lib/pkgconfig/zlib.pc only: no shared object, no manual page, no
 # example programs. zlib is under the Zlib licence. Lives in the fork as
 # .github/workflows/sond-package-zlib.yml. Generated from fredyk/sond-distro-pkg ci/forks.
 # Fork creation, for the operator:
@@ -37,7 +37,7 @@ jobs:
           build: |
             # --static leaves SHAREDLIBV empty, so no libz.so is built; configure writes zlib.pc.
             # Only the libz.a target is made, and the four files are installed by hand because
-            # the upstream install-libs target also installs share/man/man3/zlib.3.
+            # the upstream install-libs target also installs the manual page.
             CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" \
               ./configure --prefix=/ --static
             make -j"$(nproc)" libz.a
