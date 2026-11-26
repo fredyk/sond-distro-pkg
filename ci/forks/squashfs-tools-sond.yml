@@ -1,0 +1,72 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the squashfs-tools package (the unsquashfs command: incusd looks it up on PATH at
+# startup) from this fork's sond branch, static against the pinned musl, and publishes it, its
+# corresponding source first, to dist.sond.dev. Only bin/unsquashfs ships, reading gzip and xz
+# images: zlib (from its pinned v1.4 release tarball) and liblzma (from xz at its pinned v5.8.4
+# commit) are built here as static libraries and linked in; lzo, lz4 and zstd are left out.
+# Lives in the fork as .github/workflows/sond-package-squashfs-tools.yml. Generated from
+# fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator:
+#   secretd-github fork --name squashfs-tools-sond https://github.com/plougher/squashfs-tools
+#   secretd-github branch-create --name sond --sha 708c59ae80853b0845017c33b42e56061cc546cd fredyk/squashfs-tools-sond
+# then this file pushed to that branch under .github/workflows/.
+name: sond package squashfs-tools
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: squashfs-tools
+          version: 4.7.5
+          license: GPL-2.0-or-later AND Zlib AND 0BSD
+          upstream: github.com/plougher/squashfs-tools@708c59ae80853b0845017c33b42e56061cc546cd
+          license-files: |
+            COPYING
+            .sond-deps/zlib-1.4/LICENSE=share/licenses/squashfs-tools/zlib-LICENSE
+            .sond-deps/xz/COPYING.0BSD=share/licenses/squashfs-tools/liblzma-COPYING.0BSD
+          build: |
+            deps=$PWD/.sond-deps
+            mkdir -p "$deps/prefix/include" "$deps/prefix/lib"
+            # zlib: the static libz.a from the pinned release tarball.
+            curl -fsSL --retry 3 -o "$deps/zlib-1.4.tar.gz" https://github.com/madler/zlib/releases/download/v1.4/zlib-1.4.tar.gz
+            printf '02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584  %s\n' "$deps/zlib-1.4.tar.gz" | sha256sum -c -
+            tar -xzf "$deps/zlib-1.4.tar.gz" -C "$deps"
+            (cd "$deps/zlib-1.4" && CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" ./configure --static --prefix="$deps/prefix" && make libz.a)
+            install -m 0644 "$deps/zlib-1.4/libz.a" "$deps/prefix/lib/libz.a"
+            install -m 0644 "$deps/zlib-1.4/zlib.h" "$deps/zlib-1.4/zconf.h" "$deps/prefix/include/"
+            # liblzma: the static library from xz at the pinned commit, nothing else of xz.
+            git init -q "$deps/xz"
+            git -C "$deps/xz" fetch -q --depth 1 https://github.com/tukaani-project/xz d3e650e63c110e830fd5391e7f8b45df0b91d3da
+            git -C "$deps/xz" checkout -q FETCH_HEAD
+            test "$(git -C "$deps/xz" rev-parse HEAD)" = d3e650e63c110e830fd5391e7f8b45df0b91d3da
+            CC="$SOND_CC" cmake -S "$deps/xz" -B "$deps/xz/build" -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_FLAGS="$SOND_CFLAGS" -DBUILD_SHARED_LIBS=OFF -DXZ_NLS=OFF -DXZ_DOC=OFF
+            cmake --build "$deps/xz/build" --target liblzma -j "$(nproc)"
+            install -m 0644 "$deps/xz/build/liblzma.a" "$deps/prefix/lib/liblzma.a"
+            cp -R "$deps/xz/src/liblzma/api/lzma.h" "$deps/xz/src/liblzma/api/lzma" "$deps/prefix/include/"
+            # unsquashfs alone, gzip and xz only. CFLAGS and LDFLAGS through the environment: on the
+            # command line they would override the Makefile's own "CFLAGS +=" (-I., -D_GNU_SOURCE,
+            # the -D..._SUPPORT switches); the *_SUPPORT selections on the command line override
+            # the Makefile's defaults.
+            CC="$SOND_CC" CFLAGS="$SOND_CFLAGS -I$deps/prefix/include" LDFLAGS="$SOND_LDFLAGS -L$deps/prefix/lib -static" make -C squashfs-tools unsquashfs GZIP_SUPPORT=1 XZ_SUPPORT=1 LZO_SUPPORT=0 LZ4_SUPPORT=0 ZSTD_SUPPORT=0 COMP_DEFAULT=gzip -j "$(nproc)"
+            install -D -m 0755 squashfs-tools/unsquashfs "$SOND_PAYLOAD/bin/unsquashfs"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
