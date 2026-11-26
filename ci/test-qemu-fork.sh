@@ -59,9 +59,15 @@ if [ -f "$e" ]; then
 	has "$e" 'FD_SIZE_4MB' "edk2-ovmf: 4 MiB flash layout"
 	has "$e" 'submodules: recursive' "edk2-ovmf: checks out edk2's submodules (openssl, Brotli, ...)"
 	# The pairs incus 7.6 tries in /usr/share/OVMF, GENERIC and SECUREBOOT (driver_edk2.go).
-	for f in OVMF_CODE_4M.fd OVMF_VARS_4M.fd OVMF_CODE_4M.secboot.fd OVMF_VARS_4M.secboot.fd; do
+	# OVMF_CODE_4M.ms.fd/OVMF_VARS_4M.ms.fd: the SECUREBOOT pair incus picked on Roubaix (Ubuntu
+	# package ovmf has no OVMF_VARS.4MB.ms.fd, so the second entry wins) for every VM created with
+	# the default security.secureboot=true. A replica's qemu.nvram links to OVMF_VARS_4M.ms.fd, and
+	# incus starts it only with the pair whose Vars has that name.
+	for f in OVMF_CODE_4M.fd OVMF_VARS_4M.fd OVMF_CODE_4M.secboot.fd OVMF_VARS_4M.secboot.fd OVMF_CODE_4M.ms.fd OVMF_VARS_4M.ms.fd; do
 		has "$e" "\\\$SOND_PAYLOAD/share/OVMF/$f\"" "edk2-ovmf: ships share/OVMF/$f"
 	done
+	has "$e" 'virt-fw-vars .*--enroll-redhat' "edk2-ovmf: the .ms Vars template carries the Microsoft UEFI CA and KEK"
+	has "$e" 'virt-fw-vars .*--secure-boot' "edk2-ovmf: the .ms Vars template boots with secure boot on"
 	grep -q 'source-bundle' "$e" && bad "edk2-ovmf: permissive, no source lane" || ok "edk2-ovmf: permissive, no source lane"
 	rc=0
 	python3 - "$DISTRO" <<'PY' || rc=$?
