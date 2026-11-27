@@ -1,0 +1,63 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the iproute2 package (the ip command: incusd looks for it on PATH at startup, and the
+# box brings up its WireGuard interface with ip link add wg0 type wireguard, ip addr add,
+# ip link set up and ip route) from this fork's sond branch, static against the pinned musl,
+# and publishes it, its corresponding source first, to dist.sond.dev. Only bin/ip ships: tc,
+# ss, bridge, rtmon and the rest have no use on the box.
+# Lives in the fork as .github/workflows/sond-package-iproute2.yml. Generated from
+# fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator:
+#   secretd-github fork --name iproute2-sond https://github.com/iproute2/iproute2
+#   secretd-github branch-create --name sond --sha 19d1276f766daa458fb55096edb38818a7d19606 fredyk/iproute2-sond
+# then this file pushed to that branch under .github/workflows/.
+name: sond package iproute2
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: iproute2
+          version: 7.3.0
+          license: GPL-2.0-only
+          upstream: github.com/iproute2/iproute2@19d1276f766daa458fb55096edb38818a7d19606
+          license-files: |
+            COPYING
+          depends: |
+            linux-headers 6.12.77
+          build: |
+            # No optional library: configure probes libmnl, libelf, libbpf, libselinux, libcap
+            # (and xtables, libtirpc, libbsd) through pkg-config, and PKG_CONFIG=false finds none.
+            # Without libmnl ip loses only the kernel's extended-ack text in error messages.
+            CC="$SOND_CC" PKG_CONFIG=false ./configure --libbpf_force off
+            grep -q '^HAVE_MNL' config.mk && exit 1
+            grep -q '^HAVE_ELF' config.mk && exit 1
+            grep -q '^HAVE_LIBBPF' config.mk && exit 1
+            grep -q '^HAVE_SELINUX' config.mk && exit 1
+            grep -q '^HAVE_CAP' config.mk && exit 1
+            # Through the top Makefile, which carries -I../include and the defines into the
+            # subdirectories; only lib and ip. It sets CC := gcc, so CC goes on the command line;
+            # CFLAGS and LDFLAGS through the environment, which it appends to its own. A static
+            # musl has no dlopen: SHARED_LIBS=n resolves the built-in link kinds (veth, vlan...)
+            # through static-syms.o.
+            CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" make SHARED_LIBS=n CC="$SOND_CC" SUBDIRS="lib ip"
+            install -D -m 0755 ip/ip "$SOND_PAYLOAD/bin/ip"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
