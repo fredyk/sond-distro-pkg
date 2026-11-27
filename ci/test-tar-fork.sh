@@ -16,6 +16,11 @@ fails=0
 ok() { printf 'ok   %s\n' "$1"; }
 bad() { printf 'FAIL %s\n' "$1"; fails=$((fails + 1)); }
 
+rbx=$here/rbx-tar.sh
+[ -f "$rbx" ] && sh -n "$rbx" 2>/dev/null \
+	&& ok "ci/rbx-tar.sh is a POSIX wrapper the gate can run" \
+	|| bad "ci/rbx-tar.sh is a POSIX wrapper the gate can run"
+
 # Measured on 2026-11-26: sha256 of ftp.gnu.org/gnu/tar/tar-1.35.tar.xz (savannah's git timed
 # out; no GitHub mirror carries release_1_35).
 VERSION=1.35
