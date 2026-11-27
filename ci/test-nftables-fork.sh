@@ -14,6 +14,11 @@ fails=0
 ok() { printf 'ok   %s\n' "$1"; }
 bad() { printf 'FAIL %s\n' "$1"; fails=$((fails + 1)); }
 
+rbx=$here/rbx-nftables.sh
+[ -f "$rbx" ] && sh -n "$rbx" 2>/dev/null \
+	&& ok "ci/rbx-nftables.sh is a POSIX wrapper the gate can run" \
+	|| bad "ci/rbx-nftables.sh is a POSIX wrapper the gate can run"
+
 # Measured on 2026-11-26 from git.netfilter.org (git ls-remote --tags).
 VERSION=1.1.7
 UPSTREAM=git.netfilter.org/nftables@4af22fb3bef5f1672878fd7ee373947c36d33dbd
