@@ -1,0 +1,61 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the dnsmasq package (the DNS, DHCPv4/DHCPv6 and router-advertisement daemon incusd
+# execs for every managed bridge network, after exec.LookPath("dnsmasq"),
+# internal/server/network/driver_bridge.go) from this fork's sond branch, static against the
+# pinned musl, and publishes it, its corresponding source first, to dist.sond.dev. Only
+# bin/dnsmasq ships. DHCPv4, DHCPv6 and RA stay compiled in (incusd passes --dhcp-range,
+# --enable-ra, ra-stateless, ra-only, --dhcp-rapid-commit); dbus, IDN, conntrack, DNSSEC, ubus
+# and Lua are off by default and stay off; TFTP, the lease-change script, ipset/nftset and the
+# authoritative-zone mode are compiled out, since incusd never asks for them.
+# Lives in the fork as .github/workflows/sond-package-dnsmasq.yml. Generated from
+# fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator (upstream has no GitHub repository: its official git is
+# https://thekelleys.org.uk/git/dnsmasq.git):
+#   create the empty repository fredyk/dnsmasq-sond, then
+#   git clone https://thekelleys.org.uk/git/dnsmasq.git && cd dnsmasq
+#   git push https://github.com/fredyk/dnsmasq-sond 3ff66da573a77c8783deca10ec8c6bba07cd85e6:refs/heads/sond refs/tags/v2.93
+# then this file pushed to that branch under .github/workflows/.
+name: sond package dnsmasq
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: dnsmasq
+          version: 2.93
+          license: GPL-2.0-only
+          upstream: thekelleys.org.uk/git/dnsmasq@3ff66da573a77c8783deca10ec8c6bba07cd85e6
+          license-files: |
+            COPYING
+          depends: |
+            linux-headers 6.12.77
+          build: |
+            # Every source file is "version 2 dated June, 1991, or (at your option) version 3";
+            # version 2 is elected, and COPYING is its text, checked byte for byte.
+            printf '8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643  COPYING\n' | sha256sum -c -
+            # The version string pinned: bld/get-version reads git describe, which a fork's
+            # branch need not resolve to the release tag.
+            make CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" \
+              COPTS="-DNO_TFTP -DNO_SCRIPT -DNO_IPSET -DNO_AUTH" \
+              "version=-DVERSION='\\\"2.93\\\"'" all
+            install -D -m 0755 src/dnsmasq "$SOND_PAYLOAD/bin/dnsmasq"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
