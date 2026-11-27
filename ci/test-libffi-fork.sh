@@ -59,6 +59,12 @@ PY
 
 if [ -f "$yml" ]; then
 	l=$(field license)
+	# tramp.c, the dynamic trampoline source libffi 3.5.2 compiles for x86_64-linux, includes
+	# <linux/limits.h>: without the sysroot headers of the linux-headers package the recipe is
+	# not buildable at all ("linux/limits.h: No such file or directory").
+	grep -qE -- '^ +linux-headers 6\.12\.77$' "$yml" \
+		&& ok "depends linux-headers 6.12.77 (tramp.c includes <linux/limits.h>)" \
+		|| bad "depends linux-headers 6.12.77 (tramp.c includes <linux/limits.h>)"
 	[ "$l" = "MIT" ] && ok "license MIT" || bad "license MIT (found: $l)"
 	grep -qE -- '--disable-shared --enable-static' "$yml" && ok "static library only" \
 		|| bad "static library only (--disable-shared --enable-static)"
