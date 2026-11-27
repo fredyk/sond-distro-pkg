@@ -14,6 +14,11 @@ fails=0
 ok() { printf 'ok   %s\n' "$1"; }
 bad() { printf 'FAIL %s\n' "$1"; fails=$((fails + 1)); }
 
+rbx=$here/rbx-rsync.sh
+[ -f "$rbx" ] && sh -n "$rbx" 2>/dev/null \
+	&& ok "ci/rbx-rsync.sh is a POSIX wrapper the gate can run" \
+	|| bad "ci/rbx-rsync.sh is a POSIX wrapper the gate can run"
+
 # Measured on 2026-11-26 from github.com/RsyncProject/rsync at its tag v3.5.2 (latest release).
 VERSION=3.5.2
 UPSTREAM=github.com/RsyncProject/rsync@41bbd895668767e155b2eb6da64f37afa9cb8724
@@ -66,8 +71,10 @@ if [ -f "$yml" ]; then
 	[ "$l" = "$want" ] && ok "license $want" || bad "license $want (found: $l)"
 	grep -qF 'share/licenses/rsync/LGPL-2.1' "$yml" && ok "ships the LGPL-2.1 text for the static libacl" \
 		|| bad "ships the LGPL-2.1 text for the static libacl"
+	# www.gnu.org goes unreachable; ftp.gnu.org serves the same bytes, checked by the same sha.
+	grep -qF 'https://ftp.gnu.org/gnu/Licenses/lgpl-2.1.txt' "$yml" && ok "LGPL text has a second source" || bad "LGPL text has a second source"
 	grep -qF -- '--disable-md2man' "$yml" && ok "md2man is disabled" || bad "md2man is disabled"
-	for o in openssl xxhash zstd lz4; do
+	for o in openssl xxhash zstd lz4 idn; do
 		grep -qF -- "--disable-$o" "$yml" && ok "$o is disabled (incus never asks for it)" \
 			|| bad "$o is disabled"
 	done
@@ -78,6 +85,9 @@ if [ -f "$yml" ]; then
 		&& ok "xattr support is on and asserted (incus passes --xattrs)" || bad "xattr support is on and asserted"
 	grep -qE '^\s+acl [0-9]' "$yml" && ok "libacl comes from the acl package" || bad "libacl comes from the acl package"
 	grep -qE -- '-static' "$yml" && ok "the executable is linked -static" || bad "the executable is linked -static"
+	# The tag commits configure but not config.h.in/aclocal.m4: make needs prepare-source first.
+	grep -qE '\./prepare-source' "$yml" && ok "prepare-source generates config.h.in and aclocal.m4" \
+		|| bad "prepare-source generates config.h.in and aclocal.m4"
 	grep -qE 'make -j"\$\(nproc\)" rsync$' "$yml" && ok "builds only the rsync target" || bad "builds only the rsync target"
 	grep -qE 'install -D -m 0755 rsync "\$SOND_PAYLOAD/bin/rsync"' "$yml" && ok "ships bin/rsync" || bad "ships bin/rsync"
 	n=$(grep -c 'SOND_PAYLOAD' "$yml" || true)
