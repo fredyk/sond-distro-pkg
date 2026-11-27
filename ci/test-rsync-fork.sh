@@ -1,6 +1,5 @@
 #!/bin/bash
-# Shape checks for the rsync fork recipe: the rsync command alone (incusd needs it on PATH at
-# startup and receives dir volumes with it), static against the pinned musl, GPL-3.0-or-later AND LGPL-2.1-or-later
+# Shape checks for the rsync fork recipe: the rsync command alone, static against the pinned musl, GPL-3.0-or-later AND LGPL-2.1-or-later
 # AND Zlib AND MIT with its COPYING and the LGPL-2.1 text and its source lane, ACLs and xattrs in, md2man and optional libraries out. Every rule
 # ci/test-fork-workflows.sh applies to the other recipes applies here.
 # Offline: no network, no build.
@@ -75,14 +74,14 @@ if [ -f "$yml" ]; then
 	grep -qF 'https://ftp.gnu.org/gnu/Licenses/lgpl-2.1.txt' "$yml" && ok "LGPL text has a second source" || bad "LGPL text has a second source"
 	grep -qF -- '--disable-md2man' "$yml" && ok "md2man is disabled" || bad "md2man is disabled"
 	for o in openssl xxhash zstd lz4 idn; do
-		grep -qF -- "--disable-$o" "$yml" && ok "$o is disabled (incus never asks for it)" \
+		grep -qF -- "--disable-$o" "$yml" && ok "$o is disabled" \
 			|| bad "$o is disabled"
 	done
 	# incus: LocalCopy runs "rsync -a -HA" and its features add --xattrs (internal/rsync/rsync.go)
 	grep -qF -- '--enable-acl-support' "$yml" && grep -qF "SUPPORT_ACLS 1' config.h" "$yml" \
-		&& ok "ACL support is on and asserted (incus passes -A)" || bad "ACL support is on and asserted"
+		&& ok "ACL support is on and asserted" || bad "ACL support is on and asserted"
 	grep -qF -- '--enable-xattr-support' "$yml" && grep -qF "SUPPORT_XATTRS 1' config.h" "$yml" \
-		&& ok "xattr support is on and asserted (incus passes --xattrs)" || bad "xattr support is on and asserted"
+		&& ok "xattr support is on and asserted" || bad "xattr support is on and asserted"
 	grep -qE '^\s+acl [0-9]' "$yml" && ok "libacl comes from the acl package" || bad "libacl comes from the acl package"
 	grep -qE -- '-static' "$yml" && ok "the executable is linked -static" || bad "the executable is linked -static"
 	# The tag commits configure but not config.h.in/aclocal.m4: make needs prepare-source first.

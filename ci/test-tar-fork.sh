@@ -1,6 +1,5 @@
 #!/bin/bash
-# Shape checks for the tar fork recipe: GNU tar's tar command alone (incusd unpacks images and
-# backups with it, with --xattrs-include=*), static against the pinned musl with xattrs on,
+# Shape checks for the tar fork recipe: GNU tar's tar command alone, static against the pinned musl with xattrs on,
 # GPL-3.0-or-later with its COPYING and its source lane, built hermetically from the release
 # tarball (configure already generated, no ./bootstrap, no gnulib clone). Every rule
 # ci/test-fork-workflows.sh applies to the other recipes applies here. GPL-3.0-or-later must be

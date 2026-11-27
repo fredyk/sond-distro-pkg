@@ -1,9 +1,8 @@
 # Modified by the Sond project, 2026-11-26
-# Builds the iproute2 package (the ip command: incusd looks for it on PATH at startup, and the
-# box brings up its WireGuard interface with ip link add wg0 type wireguard, ip addr add,
-# ip link set up and ip route) from this fork's sond branch, static against the pinned musl,
-# and publishes it, its corresponding source first, to dist.sond.dev. Only bin/ip ships: tc,
-# ss, bridge, rtmon and the rest have no use on the box.
+# Builds the iproute2 package (the ip command: links, addresses and routes, WireGuard links
+# included) from this fork's sond branch, static against the pinned musl, and publishes it, its
+# corresponding source first, to dist.sond.dev. Only bin/ip ships: tc, ss, bridge, rtmon and
+# the rest are not built.
 # Lives in the fork as .github/workflows/sond-package-iproute2.yml. Generated from
 # fredyk/sond-distro-pkg ci/forks.
 # Fork creation, for the operator:

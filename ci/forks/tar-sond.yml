@@ -1,8 +1,7 @@
 # Modified by the Sond project, 2026-11-26
-# Builds the tar package (GNU tar 1.35: incusd unpacks images and backups with it, calling
-# --xattrs-include=* --restrict --force-local --numeric-owner --anchored --wildcards --transform
-# --strip-components and -J/-z/--zstd, which exec xz, gzip and zstd from PATH) from this fork's
-# sond branch, static against the pinned musl, with xattr support (musl has the syscalls), and
+# Builds the tar package (GNU tar 1.35, with --xattrs-include, --restrict, --force-local,
+# --numeric-owner, --transform, --strip-components and -J/-z/--zstd, which exec xz, gzip and
+# zstd from PATH) from this fork's sond branch, static against the pinned musl, with xattr support (musl has the syscalls), and
 # publishes it, its corresponding source first, to dist.sond.dev. Only bin/tar ships: no rmt,
 # no backup scripts, no NLS. GPL-3.0-or-later needs the licence admitted (branch rsync-fork).
 # Lives in the fork as .github/workflows/sond-package-tar.yml. Generated from

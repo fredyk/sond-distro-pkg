@@ -1,7 +1,5 @@
 #!/bin/bash
-# Shape checks for the dnsmasq fork recipe: the dnsmasq daemon alone (incusd execs it for every
-# managed bridge, after exec.LookPath("dnsmasq"), internal/server/network/driver_bridge.go),
-# static against the pinned musl, GPL-2.0 elected with its COPYING and its source lane. Every
+# Shape checks for the dnsmasq fork recipe: the dnsmasq daemon alone, static against the pinned musl, GPL-2.0 elected with its COPYING and its source lane. Every
 # rule ci/test-fork-workflows.sh applies to the other recipes applies here.
 # Offline: no network, no build.
 #
@@ -74,8 +72,7 @@ if [ -f "$yml" ]; then
 		|| bad "depends on linux-headers 6.12.77"
 	grep -qF 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643 "$yml" \
 		&& ok "COPYING is checked against its sha256 at the tag" || bad "COPYING is checked against its sha256 at the tag"
-	# What incusd passes (driver_bridge.go) needs DHCPv4, DHCPv6 and RA, which are on by
-	# default; it never uses dbus, IDN, conntrack, DNSSEC, TFTP, a lease script or ipset.
+	# DHCPv4, DHCPv6 and RA stay on (on by default); off: dbus, IDN, conntrack, DNSSEC, TFTP, a lease script or ipset.
 	copts=$(grep -oE 'COPTS="[^"]*"' "$yml" || true)
 	for flag in -DNO_TFTP -DNO_SCRIPT -DNO_IPSET -DNO_AUTH; do
 		case " ${copts//\"/ } " in *" $flag "*) ok "COPTS has $flag" ;; *) bad "COPTS has $flag (found: $copts)" ;; esac

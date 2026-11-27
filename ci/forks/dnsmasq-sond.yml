@@ -1,12 +1,11 @@
 # Modified by the Sond project, 2026-11-26
-# Builds the dnsmasq package (the DNS, DHCPv4/DHCPv6 and router-advertisement daemon incusd
-# execs for every managed bridge network, after exec.LookPath("dnsmasq"),
-# internal/server/network/driver_bridge.go) from this fork's sond branch, static against the
-# pinned musl, and publishes it, its corresponding source first, to dist.sond.dev. Only
-# bin/dnsmasq ships. DHCPv4, DHCPv6 and RA stay compiled in (incusd passes --dhcp-range,
-# --enable-ra, ra-stateless, ra-only, --dhcp-rapid-commit); dbus, IDN, conntrack, DNSSEC, ubus
-# and Lua are off by default and stay off; TFTP, the lease-change script, ipset/nftset and the
-# authoritative-zone mode are compiled out, since incusd never asks for them.
+# Builds the dnsmasq package (the DNS, DHCPv4/DHCPv6 and router-advertisement daemon for a
+# bridge network) from this fork's sond branch, static against the pinned musl, and publishes
+# it, its corresponding source first, to dist.sond.dev. Only bin/dnsmasq ships. DHCPv4, DHCPv6
+# and RA stay compiled in (--dhcp-range, --enable-ra, ra-stateless, ra-only,
+# --dhcp-rapid-commit); dbus, IDN, conntrack, DNSSEC, ubus and Lua are off by default and stay
+# off; TFTP, the lease-change script, ipset/nftset and the authoritative-zone mode are compiled
+# out.
 # Lives in the fork as .github/workflows/sond-package-dnsmasq.yml. Generated from
 # fredyk/sond-distro-pkg ci/forks.
 # Fork creation, for the operator (upstream has no GitHub repository: its official git is

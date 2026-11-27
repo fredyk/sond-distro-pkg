@@ -1,6 +1,5 @@
 #!/bin/bash
-# Shape checks for the iproute2 fork recipe: the ip command alone (incusd looks for it on PATH
-# at startup; the box brings up wg0 with ip link/addr/route), static against the pinned musl,
+# Shape checks for the iproute2 fork recipe: the ip command alone, static against the pinned musl,
 # with no libmnl, libelf, libbpf, libselinux or libcap, GPL-2.0 with its COPYING and its
 # source lane. Every rule
 # ci/test-fork-workflows.sh applies to the other recipes applies here.

@@ -97,6 +97,13 @@ case ${DOCKER_STATIC_URL:-} in
 *) bad "docker: the pinned static build is for ${DOCKER_VERSION:-<unset DOCKER_VERSION>} (got ${DOCKER_STATIC_URL:-unset})" ;;
 esac
 
+# A package recipe describes its own package; the packages and boxes that use it are named only
+# in their own recipes and configuration, never here. incusd's own recipe may name incusd.
+named=$(grep -l -iE 'incusd|gra-0[0-9]|lite-gateway' "$here"/forks/*.yml "$here"/test-*-fork.sh 2>/dev/null \
+	| grep -v -E '/(incusd|incus)-sond\.yml$' || true)
+[ -z "$named" ] && ok "no recipe names a package or box that uses it" \
+	|| bad "no recipe names a package or box that uses it (named in: $(echo $named | xargs -n1 basename | tr '\n' ' '))"
+
 if [ "$fails" -eq 0 ]; then
 	printf 'test-fork-workflows: OK\n'
 else

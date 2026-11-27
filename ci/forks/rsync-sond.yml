@@ -1,13 +1,11 @@
 # Modified by the Sond project, 2026-11-26
-# Builds the rsync package (the rsync command: incusd looks it up on PATH at startup, copies
-# local volumes with "rsync -a -HA --xattrs" and receives dir volumes from "incus copy --refresh"
-# with "rsync --server ... --xattrs --delete --compress", internal/rsync/rsync.go) from this
+# Builds the rsync package (the rsync command, with ACLs, xattrs and --compress) from this
 # fork's sond branch, static against the pinned musl, and publishes it, its corresponding source
 # first, to dist.sond.dev. GPL-3.0-or-later, plus libacl/libattr (LGPL-2.1-or-later, static) and
 # the zlib (Zlib) and popt (MIT) rsync builds from its own tree. Only bin/rsync ships: no rsync-ssl, no rrsync, no manpages (md2man off).
-# What incus asks of it, and nothing more: ACLs (-A) through the acl package's libacl; xattrs
-# through musl; --compress through the bundled zlib. openssl, xxhash, zstd, lz4 and idn are off: incus
-# never asks for a checksum or compression choice, and two rsyncs without them negotiate md5 and
+# ACLs (-A) through the acl package's libacl; xattrs
+# through musl; --compress through the bundled zlib. openssl, xxhash, zstd, lz4 and idn are off:
+# two rsyncs without them negotiate md5 and
 # zlib. Lives in the fork as .github/workflows/sond-package-rsync.yml. Generated from
 # fredyk/sond-distro-pkg ci/forks.
 # Fork creation, for the operator:

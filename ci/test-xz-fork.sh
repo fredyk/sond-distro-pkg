@@ -1,6 +1,5 @@
 #!/bin/bash
-# Shape checks for the xz fork recipe: the xz command alone (incusd's startup refuses to run
-# without it on PATH), static against the pinned musl, 0BSD with its texts. Every rule
+# Shape checks for the xz fork recipe: the xz command alone, static against the pinned musl, 0BSD with its texts. Every rule
 # ci/test-fork-workflows.sh applies to the other recipes applies here.
 # Offline: no network, no build.
 #

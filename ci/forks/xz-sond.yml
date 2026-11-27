@@ -1,6 +1,5 @@
 # Modified by the Sond project, 2026-11-26
-# Builds the xz package (the xz command: incusd looks it up on PATH at startup and refuses to
-# run without it, cmd/incusd/main_daemon.go) from this fork's sond branch, static against the
+# Builds the xz package (the xz command) from this fork's sond branch, static against the
 # pinned musl, and publishes it to dist.sond.dev. Only bin/xz ships: xz and liblzma are 0BSD;
 # GNU getopt_long is not compiled in because musl has a usable one; the GPL-2.0 scripts (xzgrep,
 # xzdiff, xzless, xzmore) are not built. Lives in the fork as

@@ -34,8 +34,7 @@ jobs:
             attr 2.6.0
             linux-headers 6.12.77
           build: |
-            # libacl only: the GPL-2.0 tools (getfacl, setfacl, chacl) are not built (licence opinion,
-            # incusd table). libacl reads extended attributes through the C library;
+            # libacl only: the GPL-2.0 tools (getfacl, setfacl, chacl) are not built (licence opinion). libacl reads extended attributes through the C library;
             # from attr it takes only the error_context.h header.
             ./autogen.sh
             ./configure --prefix=/ --disable-shared --enable-static --disable-nls \
