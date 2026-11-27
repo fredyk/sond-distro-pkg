@@ -37,6 +37,10 @@ if [ -f "$yml" ]; then
 		&& ok "license names nftables, libnftnl and libmnl" || bad "license names nftables, libnftnl and libmnl"
 	grep -qF 'libmnl-1.0.5' "$yml" && ok "libmnl pinned at 1.0.5" || bad "libmnl pinned at 1.0.5"
 	grep -qF 'libnftnl-1.3.2' "$yml" && ok "libnftnl pinned at 1.3.2" || bad "libnftnl pinned at 1.3.2"
+	# libmnl/libnftnl and nftables include linux/types.h, linux/netlink.h and the netfilter UAPI
+	# headers: the pinned kernel headers, not the runner's.
+	grep -qE '^\s+linux-headers 6\.12\.77$' "$yml" && ok "depends on linux-headers 6.12.77" \
+		|| bad "depends on linux-headers 6.12.77"
 	n=$(grep -cE 'sha256sum -c' "$yml" || true)
 	[ "$n" -ge 2 ] && ok "both library tarballs are hash-checked" || bad "both library tarballs are hash-checked ($n)"
 	for opt in --disable-shared --enable-static --with-mini-gmp --without-cli --without-xtables --without-json; do

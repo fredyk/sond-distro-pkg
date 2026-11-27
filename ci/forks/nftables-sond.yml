@@ -39,6 +39,8 @@ jobs:
             COPYING
             .sond-licences/libnftnl-COPYING=share/licenses/nftables/libnftnl-COPYING
             .sond-licences/libmnl-COPYING=share/licenses/nftables/libmnl-COPYING
+          depends: |
+            linux-headers 6.12.77
           build: |
             deps=$PWD/.sond-deps
             mkdir -p "$deps/src" .sond-licences
