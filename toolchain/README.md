@@ -11,7 +11,7 @@ builder to consume.
 | mksh | mksh-R59, upstream commit `8deec0b465ed59108331b0a112564f2a89156536` |
 | musl | 1.2.5, commit `0784374d561435f7c787a555aeab8ede699ed298`, built from the release tarball |
 | `SOURCE_DATE_EPOCH` | `1794960000` (2026-11-18T00:00:00Z) |
-| commands | `cat cp echo grep ls mkdir mount mv ps rm` (no `sh`: the shell is mksh) |
+| commands | `cat cp echo grep ls mkdir mount mv ps rm setfattr` (no `sh`: the shell is mksh) |
 
 ## Scripts
 

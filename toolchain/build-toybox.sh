@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build a static toybox, linked against the private musl, with the minimal
-# configuration this area ships: CONFIG_TOYBOX plus exactly the ten utilities
+# configuration this area ships: CONFIG_TOYBOX plus exactly the utilities
 # from $TOYBOX_COMMANDS. No sh: /bin/sh is mksh.
 #
 # usage: build-toybox.sh [SOURCE_TREE] [WORK_DIR]
@@ -40,12 +40,12 @@ cd "$TREE"
 
 # --- non-interactive minimal configuration --------------------------------
 # allnoconfig turns every symbol off (except the ones without a prompt, which
-# kconfig resolves from their default), then the ten required utilities are
+# kconfig resolves from their default), then the required utilities are
 # turned on explicitly and silentoldconfig folds them in. No menu, no tty.
 if [ ! -f .config ]; then
 	make allnoconfig
 fi
-for sym in TOYBOX LS PS CAT CP MV RM MKDIR MOUNT ECHO GREP; do
+for sym in TOYBOX LS PS CAT CP MV RM MKDIR MOUNT ECHO GREP SETFATTR; do
 	grep -qx "CONFIG_$sym=y" .config || printf 'CONFIG_%s=y\n' "$sym" >>.config
 done
 make silentoldconfig
@@ -74,7 +74,7 @@ chmod u+w toybox
 strip -s toybox
 chmod 0755 toybox
 
-# The binary must expose exactly the ten commands and nothing else. This is
+# The binary must expose exactly the TOYBOX_COMMANDS and nothing else. This is
 # the requirement test-static.sh re-checks on the published copy.
 EXPECTED=$(printf '%s\n' $TOYBOX_COMMANDS | sort)
 ACTUAL=$("$TREE/toybox" 2>/dev/null | tr ' \t' '\n' | sed '/^$/d' | sort -u)
