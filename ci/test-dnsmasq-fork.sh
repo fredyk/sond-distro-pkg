@@ -83,7 +83,10 @@ if [ -f "$yml" ]; then
 		|| bad "ships bin/dnsmasq"
 	n=$(grep -c 'SOND_PAYLOAD' "$yml" || true)
 	[ "$n" = 1 ] && ok "ships nothing else (no man page, no translations)" || bad "ships nothing else ($n payload writes)"
-	grep -qF "DVERSION='\\\"$VERSION\\\"'" "$yml" && ok "the version string is pinned, not read from git describe" \
+	# A version define on make's command line overrides the Makefile's bld/get-version default
+	# (which reads git describe). The quoting must survive two shell expansions so gcc sees the C
+	# string "2.93": ci/rbx-build-dnsmasq.sh is what proves that.
+	grep -qE 'version=-DVERSION=' "$yml" && ok "the version string is pinned, not read from git describe" \
 		|| bad "the version string is pinned, not read from git describe"
 	missing=$(python3 - "$DISTRO" "$yml" "$l" <<'PY2'
 import sys

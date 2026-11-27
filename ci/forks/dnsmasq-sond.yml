@@ -51,7 +51,7 @@ jobs:
             # branch need not resolve to the release tag.
             make CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" \
               COPTS="-DNO_TFTP -DNO_SCRIPT -DNO_IPSET -DNO_AUTH" \
-              "version=-DVERSION='\"2.93\"'" all
+              "version=-DVERSION='\\\"2.93\\\"'" all
             install -D -m 0755 src/dnsmasq "$SOND_PAYLOAD/bin/dnsmasq"
       - uses: fredyk/sond-publish-action@v1
         with:
