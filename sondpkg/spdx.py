@@ -23,6 +23,10 @@ LICENSE_ATOMS = frozenset({
     "blessing", "BSD-2-Clause", "ISC", "LGPL-3.0-only",
     # ca-certificates: Mozilla's root certificates (certdata.txt) as one PEM bundle
     "MPL-2.0",
+    # rsync: incusd needs it on PATH and receives dir volumes with it
+    "GPL-3.0-or-later",
+    # rsync builds the zlib bundled in its tree (--with-included-zlib)
+    "Zlib",
 })
 # Identifiers a component linked into the package may use.
 BUNDLED_ATOMS = LICENSE_ATOMS | frozenset({
