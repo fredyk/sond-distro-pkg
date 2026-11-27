@@ -70,7 +70,10 @@ if [ -f "$yml" ]; then
 		&& bad "hermetic: no ./bootstrap, autoreconf or clone in the build" || ok "hermetic: no ./bootstrap, autoreconf or clone in the build"
 	grep -qE -- '--enable-xattrs' "$yml" && ok "xattr support is on (--xattrs-include)" || bad "xattr support is on (--enable-xattrs)"
 	grep -qE -- '--disable-nls' "$yml" && ok "no NLS" || bad "no NLS (--disable-nls)"
-	grep -qE -- '--without-rmt' "$yml" && ok "rmt is not built" || bad "rmt is not built (--without-rmt)"
+	# GNU tar's configure rejects --without-rmt ("Invalid argument to --with-rmt"); an absolute
+	# --with-rmt=FILE names the default rmt and stops the included copy from being built.
+	grep -qE -- '--with-rmt=/nonexistent/rmt' "$yml" && ok "rmt is not built (--with-rmt=/nonexistent/rmt)" \
+		|| bad "rmt is not built (--with-rmt=/nonexistent/rmt)"
 	grep -qE 'make .*-C src tar$' "$yml" && ok "builds only the tar target" || bad "builds only the tar target"
 	grep -qE -- '-static' "$yml" && ok "the executable is linked -static" || bad "the executable is linked -static"
 	grep -qE 'install -D -m 0755 src/tar "\$SOND_PAYLOAD/bin/tar"' "$yml" && ok "ships bin/tar" || bad "ships bin/tar"

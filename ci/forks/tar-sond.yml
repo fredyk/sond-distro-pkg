@@ -51,7 +51,7 @@ jobs:
             find . -path ./.git -prune -o -type f -exec touch -r configure {} +
             CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" \
               ./configure --disable-nls --disable-rpath --enable-xattrs --without-selinux \
-              --without-posix-acls --without-rmt --disable-gcc-warnings \
+              --without-posix-acls --with-rmt=/nonexistent/rmt --disable-gcc-warnings \
               DEFAULT_RMT_DIR=/nonexistent
             make -j "$(nproc)" -C gnu
             make -j "$(nproc)" -C lib
