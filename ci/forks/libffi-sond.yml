@@ -37,6 +37,13 @@ jobs:
           upstream: github.com/libffi/libffi@e2eda0cf72a0598b44278cc91860ea402273fa29
           license-files: |
             LICENSE
+          # tramp.c, the dynamic trampoline source libffi compiles for x86_64-linux, includes
+          # <linux/limits.h>: with only musl's headers on the search path the compile stops on
+          # "linux/limits.h: No such file or directory", so the headers must come from the
+          # sysroot of the linux-headers package. automake's own compile commands keep -MD, and
+          # those .deps/*.Plo files are what says which headers were used.
+          depends: |
+            linux-headers 6.12.77
           build: |
             ./autogen.sh
             ./configure --prefix=/ --disable-shared --enable-static --disable-docs \
