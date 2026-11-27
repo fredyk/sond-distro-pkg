@@ -1,0 +1,65 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the tar package (GNU tar 1.35: incusd unpacks images and backups with it, calling
+# --xattrs-include=* --restrict --force-local --numeric-owner --anchored --wildcards --transform
+# --strip-components and -J/-z/--zstd, which exec xz, gzip and zstd from PATH) from this fork's
+# sond branch, static against the pinned musl, with xattr support (musl has the syscalls), and
+# publishes it, its corresponding source first, to dist.sond.dev. Only bin/tar ships: no rmt,
+# no backup scripts, no NLS. GPL-3.0-or-later needs the licence admitted (branch rsync-fork).
+# Lives in the fork as .github/workflows/sond-package-tar.yml. Generated from
+# fredyk/sond-distro-pkg ci/forks.
+# Upstream: savannah's git timed out and no GitHub mirror carries release_1_35, so the pin is
+# the release tarball ftp.gnu.org/gnu/tar/tar-1.35.tar.xz, sha256 4d62ff37...3edc16. The
+# tarball also keeps the build hermetic: its configure and gnulib copy are generated, where a
+# git checkout needs ./bootstrap, which clones gnulib over the network and needs autotools.
+# Fork creation, for the operator:
+#   secretd-github repo-create --name tar-sond fredyk
+#   curl -fsSLO https://ftp.gnu.org/gnu/tar/tar-1.35.tar.xz
+#   echo '4d62ff37342ec7aed748535323930c7cf94acf71c3591882b26a7ea50f3edc16  tar-1.35.tar.xz' | sha256sum -c -
+#   tar -xJf tar-1.35.tar.xz && cd tar-1.35 && git init -b sond && git add -A
+#   git commit -m 'GNU tar 1.35 release tarball, sha256 4d62ff37342ec7aed748535323930c7cf94acf71c3591882b26a7ea50f3edc16'
+# then this file committed under .github/workflows/ and the sond branch pushed.
+name: sond package tar
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: tar
+          version: 1.35
+          license: GPL-3.0-or-later
+          upstream: ftp.gnu.org/gnu/tar/tar-1.35.tar.xz@sha256:4d62ff37342ec7aed748535323930c7cf94acf71c3591882b26a7ea50f3edc16
+          license-files: |
+            COPYING
+          build: |
+            # The tree is the release tarball as is: configure is already generated, nothing
+            # is fetched. A git checkout leaves timestamps newer than configure; touch them back
+            # so make never reruns autotools.
+            find . -path ./.git -prune -o -type f -exec touch -r configure {} +
+            CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" \
+              ./configure --disable-nls --disable-rpath --enable-xattrs --without-selinux \
+              --without-posix-acls --with-rmt=/nonexistent/rmt --disable-gcc-warnings \
+              DEFAULT_RMT_DIR=/nonexistent
+            make -j "$(nproc)" -C gnu
+            make -j "$(nproc)" -C lib
+            make -j "$(nproc)" -C src tar
+            install -D -m 0755 src/tar "$SOND_PAYLOAD/bin/tar"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
