@@ -15,6 +15,11 @@ fails=0
 ok() { printf 'ok   %s\n' "$1"; }
 bad() { printf 'FAIL %s\n' "$1"; fails=$((fails + 1)); }
 
+rbx=$here/rbx-iproute2.sh
+[ -f "$rbx" ] && sh -n "$rbx" 2>/dev/null \
+	&& ok "ci/rbx-iproute2.sh is a POSIX wrapper the gate can run" \
+	|| bad "ci/rbx-iproute2.sh is a POSIX wrapper the gate can run"
+
 # Measured on 2026-11-26 from github.com/iproute2/iproute2 at its tag v7.3.0.
 VERSION=7.3.0
 UPSTREAM=github.com/iproute2/iproute2@19d1276f766daa458fb55096edb38818a7d19606
