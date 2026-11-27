@@ -1,8 +1,8 @@
 #!/bin/bash
 # Shape checks for the squashfs-tools fork recipe: the unsquashfs command alone (incusd looks it
-# up on PATH at startup), static against the pinned musl, reading gzip and xz images through a
-# zlib and a liblzma built in the same job from pinned sources and linked in, GPL-2.0 with its
-# COPYING, the texts of both libraries and its source lane. Every rule
+# up on PATH at startup), static against the pinned musl, reading gzip and xz images through the
+# published zlib 1.3.2 and liblzma 5.8.4 packages under depends, GPL-2.0 with its COPYING and
+# its source lane. Every rule
 # ci/test-fork-workflows.sh applies to the other recipes applies here.
 # Offline: no network, no build.
 #
@@ -23,10 +23,7 @@ rbx=$here/rbx-squashfs-tools.sh
 # Measured on 2026-11-26 from github.com/plougher/squashfs-tools at its tag 4.7.5 (latest release).
 VERSION=4.7.5
 UPSTREAM=github.com/plougher/squashfs-tools@708c59ae80853b0845017c33b42e56061cc546cd
-# The libraries linked in: xz at its tag v5.8.4, zlib's release tarball for v1.4 (madler/zlib).
-XZ_COMMIT=d3e650e63c110e830fd5391e7f8b45df0b91d3da
-ZLIB_URL=https://github.com/madler/zlib/releases/download/v1.4/zlib-1.4.tar.gz
-ZLIB_SHA256=02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584
+# The libraries linked in: the published liblzma 5.8.4 (0BSD) and zlib 1.3.2 (Zlib) packages.
 LICENCE="GPL-2.0-or-later AND Zlib AND 0BSD"
 
 # --- the same criterion as ci/test-fork-workflows.sh, through its own check() ---
@@ -72,14 +69,15 @@ if [ -f "$yml" ]; then
 	l=$(field license)
 	# unsquashfs links the squashfs-tools sources (GPL-2.0-or-later), zlib (Zlib) and liblzma (0BSD).
 	[ "$l" = "$LICENCE" ] && ok "license $LICENCE" || bad "license $LICENCE (found: $l)"
-	grep -qF "$XZ_COMMIT" "$yml" && grep -qE "git -C \S+ rev-parse HEAD.*$XZ_COMMIT|$XZ_COMMIT.*rev-parse" "$yml" \
-		&& ok "liblzma comes from xz at the pinned commit, checked" || bad "liblzma comes from xz at the pinned commit, checked"
-	grep -qF "$ZLIB_URL" "$yml" && grep -qE "$ZLIB_SHA256 .*sha256sum -c|$ZLIB_SHA256.*\| sha256sum -c" "$yml" \
-		&& ok "zlib comes from the pinned tarball, checked against its sha256" || bad "zlib comes from the pinned tarball, checked against its sha256"
-	grep -qE -- '-DBUILD_SHARED_LIBS=OFF' "$yml" && grep -qE -- '--target liblzma' "$yml" \
-		&& ok "only the static liblzma is built from xz" || bad "only the static liblzma is built from xz"
-	grep -qE -- '--static' "$yml" && grep -qE 'make .*libz\.a' "$yml" \
-		&& ok "only the static libz.a is built from zlib" || bad "only the static libz.a is built from zlib"
+	# zlib and liblzma are published packages: the recipe lists them under depends and does not
+	# build them in the job.
+	grep -qE '^\s+liblzma 5\.8\.4$' "$yml" && ok "depends on liblzma 5.8.4" || bad "depends on liblzma 5.8.4"
+	grep -qE '^\s+zlib 1\.3\.2$' "$yml" && ok "depends on zlib 1.3.2" || bad "depends on zlib 1.3.2"
+	if grep -qE 'zlib-1\.4|libz\.a|--target liblzma|github\.com/tukaani-project/xz' "$yml"; then
+		bad "zlib and liblzma are not built in the job"
+	else
+		ok "zlib and liblzma are not built in the job"
+	fi
 	# Upstream's Makefile appends its own flags with "CFLAGS +=": on the command line CFLAGS would
 	# override them, so the compile flags go through the environment.
 	grep -qE 'CFLAGS="\$SOND_CFLAGS[^"]*" LDFLAGS="\$SOND_LDFLAGS[^"]*-static[^"]*" make -C squashfs-tools unsquashfs ' "$yml" \
@@ -92,9 +90,7 @@ if [ -f "$yml" ]; then
 		&& ok "ships bin/unsquashfs" || bad "ships bin/unsquashfs"
 	n=$(grep -c 'SOND_PAYLOAD' "$yml" || true)
 	[ "$n" = 1 ] && ok "ships nothing else (no mksquashfs, no sqfscat link)" || bad "ships nothing else ($n payload writes)"
-	for t in COPYING '=share/licenses/squashfs-tools/zlib-LICENSE' '=share/licenses/squashfs-tools/liblzma-COPYING.0BSD'; do
-		grep -qE "^\s+\S*$t$" "$yml" && ok "license-files ships $t" || bad "license-files ships $t"
-	done
+	grep -qE '^\s+COPYING$' "$yml" && ok "license-files ships COPYING" || bad "license-files ships COPYING"
 	missing=$(python3 - "$DISTRO" "$yml" "$l" <<'PY2'
 import sys
 sys.path.insert(0, sys.argv[1])
