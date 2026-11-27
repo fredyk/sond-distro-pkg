@@ -14,6 +14,11 @@ DISTRO=$(cd "$here/.." && pwd)
 fails=0
 ok() { printf 'ok   %s\n' "$1"; }
 bad() { printf 'FAIL %s\n' "$1"; fails=$((fails + 1)); }
+
+rbx=$here/rbx-toybox.sh
+[ -f "$rbx" ] && sh -n "$rbx" 2>/dev/null \
+	&& ok "ci/rbx-toybox.sh is a POSIX wrapper the gate can run" \
+	|| bad "ci/rbx-toybox.sh is a POSIX wrapper the gate can run"
 sorted() { printf '%s\n' $1 | sort | tr '\n' ' '; }
 
 cmds=$(sed -n 's/^TOYBOX_COMMANDS="\(.*\)"$/\1/p' "$DISTRO/toolchain/common.sh")
