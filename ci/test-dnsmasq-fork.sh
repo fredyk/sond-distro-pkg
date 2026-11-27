@@ -14,6 +14,11 @@ fails=0
 ok() { printf 'ok   %s\n' "$1"; }
 bad() { printf 'FAIL %s\n' "$1"; fails=$((fails + 1)); }
 
+rbx=$here/rbx-dnsmasq.sh
+[ -f "$rbx" ] && sh -n "$rbx" 2>/dev/null \
+	&& ok "ci/rbx-dnsmasq.sh is a POSIX wrapper the gate can run" \
+	|| bad "ci/rbx-dnsmasq.sh is a POSIX wrapper the gate can run"
+
 # Measured on 2026-11-26 from thekelleys.org.uk/git/dnsmasq.git at its tag v2.93 (peeled).
 VERSION=2.93
 UPSTREAM=thekelleys.org.uk/git/dnsmasq@3ff66da573a77c8783deca10ec8c6bba07cd85e6
