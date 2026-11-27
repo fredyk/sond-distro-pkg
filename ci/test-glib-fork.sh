@@ -50,6 +50,28 @@ if [ -f "$yml" ]; then
 		|| bad "--wrap-mode=nodownload"
 	has '^ +pcre2 [0-9]' && ok "depends on pcre2" || bad "depends on pcre2"
 	has '^ +libffi [0-9]' && ok "depends on libffi" || bad "depends on libffi"
+	# gio's gzlibcompressor.c (built by meson with the rest of glib) includes <zlib.h>; the pin so
+	# the header comes from the sysroot of the zlib package, not from whatever the runner has.
+	has '^ +zlib 1\.3\.2$' && ok "depends zlib 1.3.2 (gio compiles <zlib.h> against the sysroot)" \
+		|| bad "depends zlib 1.3.2 (gio compiles <zlib.h> against the sysroot)"
+	# The package ships the three promised libraries only: meson also installs gio and gobject
+	# (their archives, .pc files and headers) and two more gmodule .pc variants, and leaving them
+	# in makes a consumer's static run configure find gio (qemu's gio probe is an auto feature)
+	# and drag libffi in through it. Deleted by file name, not by pattern.
+	has 'rm -f "\$SOND_PAYLOAD/lib/libgio-2\.0\.a" "\$SOND_PAYLOAD/lib/libgobject-2\.0\.a"' \
+		&& ok "removes the gio and gobject archives" || bad "removes the gio and gobject archives"
+	has 'rm -f "\$SOND_PAYLOAD/lib/pkgconfig/gio-2\.0\.pc" "\$SOND_PAYLOAD/lib/pkgconfig/gio-unix-2\.0\.pc"' \
+		&& ok "removes the gio .pc files" || bad "removes the gio .pc files"
+	has '"\$SOND_PAYLOAD/lib/pkgconfig/gobject-2\.0\.pc"' && ok "removes gobject-2.0.pc" \
+		|| bad "removes gobject-2.0.pc"
+	has 'rm -f "\$SOND_PAYLOAD/lib/pkgconfig/gmodule-2\.0\.pc" "\$SOND_PAYLOAD/lib/pkgconfig/gmodule-export-2\.0\.pc"' \
+		&& ok "removes the unused gmodule .pc variants" || bad "removes the unused gmodule .pc variants"
+	has 'rm -rf "\$SOND_PAYLOAD/include/gio-unix-2\.0" "\$SOND_PAYLOAD/include/glib-2\.0/gio"' \
+		&& ok "removes the gio headers" || bad "removes the gio headers"
+	has '"\$SOND_PAYLOAD/include/glib-2\.0/gobject"' && ok "removes the gobject headers" \
+		|| bad "removes the gobject headers"
+	has 'rm -f "\$SOND_PAYLOAD/include/glib-2\.0/glib-object\.h"' && ok "removes glib-object.h" \
+		|| bad "removes glib-object.h"
 	# payload: lib/*.a, include, lib/pkgconfig and nothing else (no bin/, share/ beyond licences).
 	has 'rm -rf "\$SOND_PAYLOAD/bin" "\$SOND_PAYLOAD/share"' && ok "ships no programs or data" \
 		|| bad "ships no programs or data (bin/ and share/ removed)"
