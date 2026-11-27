@@ -1,0 +1,74 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the nftables package (the nft command) from this fork's sond branch, static against the
+# pinned musl, with libmnl 1.0.5 and libnftnl 1.3.2 built in-job from hash-checked tarballs, and
+# publishes it, its corresponding source first, to dist.sond.dev. dockerd 29.10.1 (a static build)
+# drives its nftables firewall backend by exec'ing nft from PATH (moby docker-v29.10.1
+# daemon/libnetwork/internal/nftables/nft_exec_linux.go:1,23-30), and incus's bridge needs nft
+# too. Only bin/nft ships: no libnftables.so, no headers, no examples.
+# Lives in the fork as .github/workflows/sond-package-nftables.yml. Generated from
+# fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator:
+#   secretd-github fork --name nftables-sond https://github.com/nftables/nftables   (or import git://git.netfilter.org/nftables)
+#   secretd-github branch-create --name sond --sha 4af22fb3bef5f1672878fd7ee373947c36d33dbd fredyk/nftables-sond
+# then this file pushed to that branch under .github/workflows/.
+name: sond package nftables
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: nftables
+          version: 1.1.7
+          license: GPL-2.0-only AND GPL-2.0-or-later AND LGPL-2.1-or-later
+          upstream: git.netfilter.org/nftables@4af22fb3bef5f1672878fd7ee373947c36d33dbd
+          license-files: |
+            COPYING
+            .sond-licences/libnftnl-COPYING=share/licenses/nftables/libnftnl-COPYING
+            .sond-licences/libmnl-COPYING=share/licenses/nftables/libmnl-COPYING
+          depends: |
+            linux-headers 6.12.77
+          build: |
+            deps=$PWD/.sond-deps
+            mkdir -p "$deps/src" .sond-licences
+            cd "$deps/src"
+            curl -fsSL --retry 3 -O https://www.netfilter.org/projects/libmnl/files/libmnl-1.0.5.tar.bz2
+            curl -fsSL --retry 3 -O https://www.netfilter.org/projects/libnftnl/files/libnftnl-1.3.2.tar.xz
+            sha256sum -c <<<"274b9b919ef3152bfb3da3a13c950dd60d6e2bcd54230ffeca298d03b40d0525  libmnl-1.0.5.tar.bz2"
+            sha256sum -c <<<"c97abc3409f8fa396b4462b2bb7f147a3a47a4ddc97cfa0b2f18890c9cfde8b0  libnftnl-1.3.2.tar.xz"
+            tar -xjf libmnl-1.0.5.tar.bz2
+            tar -xJf libnftnl-1.3.2.tar.xz
+            export CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS"
+            export PKG_CONFIG_PATH="$deps/lib/pkgconfig" PKG_CONFIG="pkg-config --static"
+            (cd libmnl-1.0.5 && ./configure --prefix="$deps" --disable-shared --enable-static && make -j"$(nproc)" install)
+            (cd libnftnl-1.3.2 && ./configure --prefix="$deps" --disable-shared --enable-static && make -j"$(nproc)" install)
+            cp libnftnl-1.3.2/COPYING "$OLDPWD/.sond-licences/libnftnl-COPYING"
+            cp libmnl-1.0.5/COPYING "$OLDPWD/.sond-licences/libmnl-COPYING"
+            cd "$OLDPWD"
+            # A git checkout has no configure script yet.
+            ./autogen.sh
+            # mini-gmp instead of libgmp, no readline/editline shell, no xtables translation and
+            # no JSON output: nothing the box would have to carry besides musl.
+            ./configure --disable-shared --enable-static --with-mini-gmp --without-cli \
+              --without-xtables --without-json --disable-man-doc --disable-python
+            make -j"$(nproc)" LDFLAGS="$SOND_LDFLAGS -all-static"
+            install -D -m 0755 src/nft "$SOND_PAYLOAD/bin/nft"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
