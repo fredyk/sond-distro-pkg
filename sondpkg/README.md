@@ -102,7 +102,7 @@ No network, no root, everything written under a `tempfile`.
 - Manifest parser: the packager's own (`show`/`verify-bundle`); not JSON, not XML.
 - Licences: `share/licenses/<name>/<basename>`, upstream file name kept.
 - SPDX allowlist: `0BSD`, `MirOS`, `MIT`; anything else is rejected.
-- `tier`: only `public` is defined today; anything else is rejected.
+- `tier`: `public` (open licences) or `private` (only `LicenseRef-Proprietary`, objects served to a read token); anything else is rejected.
 - `source`/`upstream`: must be `<repo>@<40-hex commit>`; no default, no invention.
 - musl in `linkage`: `share/licenses/<pkg>/musl-COPYRIGHT` must exist or the build is rejected.
 - `mksh-static`: `LICENCE-MirOS.txt` and `UNICODE-NOTICE` must exist or the build is rejected.
