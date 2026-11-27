@@ -63,6 +63,10 @@ if [ -f "$yml" ]; then
 	[ "$l" = "GPL-2.0-only" ] && ok "license GPL-2.0-only (elected from GPL-2.0-only OR GPL-3.0-only)" \
 		|| bad "license GPL-2.0-only (found: $l)"
 	grep -qE '^\s+COPYING$' "$yml" && ok "ships COPYING, the GPL-2.0 text" || bad "ships COPYING, the GPL-2.0 text"
+	# dnsmasq.h includes linux/version.h, linux/capability.h, linux/netlink.h, linux/rtnetlink.h,
+	# linux/sockios.h and linux/types.h: the pinned kernel UAPI headers, not the runner's.
+	grep -qE '^\s+linux-headers 6\.12\.77$' "$yml" && ok "depends on linux-headers 6.12.77" \
+		|| bad "depends on linux-headers 6.12.77"
 	grep -qF 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643 "$yml" \
 		&& ok "COPYING is checked against its sha256 at the tag" || bad "COPYING is checked against its sha256 at the tag"
 	# What incusd passes (driver_bridge.go) needs DHCPv4, DHCPv6 and RA, which are on by

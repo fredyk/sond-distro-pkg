@@ -41,6 +41,8 @@ jobs:
           upstream: thekelleys.org.uk/git/dnsmasq@3ff66da573a77c8783deca10ec8c6bba07cd85e6
           license-files: |
             COPYING
+          depends: |
+            linux-headers 6.12.77
           build: |
             # Every source file is "version 2 dated June, 1991, or (at your option) version 3";
             # version 2 is elected, and COPYING is its text, checked byte for byte.
