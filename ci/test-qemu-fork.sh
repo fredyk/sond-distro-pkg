@@ -46,6 +46,15 @@ if [ -f "$q" ]; then
 	for d in glib pixman zlib; do
 		printf '%s\n' "$deps" | grep -qE "^ +$d " && ok "qemu: depends on $d" || bad "qemu: depends on $d"
 	done
+	# The pins of the sibling fork packages, no placeholders (TODO) allowed: linux-headers comes
+	# from toolchain/common.sh; glib 2.86.5, pcre2 10.49, pixman 0.46.4 and zlib 1.3.2 from the
+	# versions the sibling recipes publish. pkg-config --static of glib-2.0.pc pulls
+	# -lpcre2-8 through Requires.private (all the meson, prefer_static: the qemu's configure
+	# adds -Dprefer_static=true for --static), so pcre2 must be in the sysroot.
+	for p in 'linux-headers 6\.12\.77' 'glib 2\.86\.5' 'pcre2 10\.49' 'pixman 0\.46\.4' 'zlib 1\.3\.2'; do
+		printf '%s\n' "$deps" | grep -qE "^ +$p$" && ok "qemu: depends $p" || bad "qemu: depends $p"
+	done
+	grep -q 'TODO' "$q" && bad "qemu: no TODO pin left in the recipe" || ok "qemu: no TODO pin left in the recipe"
 	has "$q" 'install -D -m 0755 build/qemu-system-x86_64 "\$SOND_PAYLOAD/bin/qemu-system-x86_64"' "qemu: ships bin/qemu-system-x86_64"
 	has "$q" 'install -D -m 0755 build/qemu-img "\$SOND_PAYLOAD/bin/qemu-img"' "qemu: ships bin/qemu-img"
 	has "$q" 'bios-256k.bin' "qemu: ships bios-256k.bin (security.csm VMs)"
