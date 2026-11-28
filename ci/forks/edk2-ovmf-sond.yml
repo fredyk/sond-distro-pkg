@@ -30,7 +30,9 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-      - run: sudo apt-get install -y -qq --no-install-recommends nasm iasl uuid-dev python3
+      - run: sudo apt-get install -y -qq --no-install-recommends nasm iasl uuid-dev python3 python3-pip
+      # virt-firmware (virt-fw-vars) enrolls the Microsoft keys into the .ms Vars template.
+      - run: pip3 install --user --break-system-packages virt-firmware==24.11
       - id: build
         uses: fredyk/sond-build-action@v1
         with:
@@ -59,6 +61,14 @@ jobs:
             build $common -D SECURE_BOOT_ENABLE=TRUE -D SMM_REQUIRE=TRUE
             install -m 0644 $fv/OVMF_CODE.fd "$SOND_PAYLOAD/share/OVMF/OVMF_CODE_4M.secboot.fd"
             install -m 0644 $fv/OVMF_VARS.fd "$SOND_PAYLOAD/share/OVMF/OVMF_VARS_4M.secboot.fd"
+            # The .ms pair, Ubuntu's names: incus's SECUREBOOT list tries OVMF_VARS_4M.ms.fd before
+            # .secboot, so on Roubaix (package ovmf) every VM left at security.secureboot=true got
+            # a qemu.nvram linking to OVMF_VARS_4M.ms.fd, and a replica starts only with that name.
+            # Code: the secure boot SMM build, as Ubuntu's OVMF_CODE_4M.ms.fd. Vars: the same empty
+            # store with the Microsoft UEFI CA and KEK enrolled and secure boot on, so a fresh VM
+            # boots shim-signed Ubuntu and Debian images like on Roubaix.
+            install -m 0644 $fv/OVMF_CODE.fd "$SOND_PAYLOAD/share/OVMF/OVMF_CODE_4M.ms.fd"
+            ~/.local/bin/virt-fw-vars --input $fv/OVMF_VARS.fd --output "$SOND_PAYLOAD/share/OVMF/OVMF_VARS_4M.ms.fd" --enroll-redhat --secure-boot
       - uses: fredyk/sond-publish-action@v1
         with:
           bundle: ${{ steps.build.outputs.bundle }}
