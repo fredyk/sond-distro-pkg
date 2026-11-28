@@ -1,7 +1,7 @@
 #!/bin/bash
-# Shape checks for the squashfs-tools fork recipe: the unsquashfs command alone (incusd looks it
-# up on PATH at startup), static against the pinned musl, reading gzip and xz images through the
-# published zlib 1.3.2 and liblzma 5.8.4 packages under depends, GPL-2.0 with its COPYING and
+# Shape checks for the squashfs-tools fork recipe: the unsquashfs command alone, static
+# against the pinned musl, reading gzip and xz images through the published
+# zlib 1.3.2 and liblzma 5.8.4 packages under depends, GPL-2.0 with its COPYING and
 # its source lane. Every rule
 # ci/test-fork-workflows.sh applies to the other recipes applies here.
 # Offline: no network, no build.
