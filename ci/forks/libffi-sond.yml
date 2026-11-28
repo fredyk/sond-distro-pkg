@@ -46,8 +46,14 @@ jobs:
             linux-headers 6.12.77
           build: |
             ./autogen.sh
+            # --disable-builddir: libffi's configure otherwise restarts itself inside a
+            # ./<target-triplet> directory (AX_ENABLE_BUILDDIR does this for every in-tree
+            # build), so include/Makefile would land under that directory and the
+            # `make -C include ... install-nodist_includeHEADERS` below would find no target
+            # and no header to ship. With it, configure stays in the checkout and the include
+            # Makefile is generated where this recipe installs from.
             ./configure --prefix=/ --disable-shared --enable-static --disable-docs \
-              --disable-multi-os-directory \
+              --disable-multi-os-directory --disable-builddir \
               CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static"
             make -j"$(nproc)" libffi.la
             make DESTDIR="$SOND_PAYLOAD" install-toolexeclibLTLIBRARIES install-pkgconfigDATA
