@@ -57,7 +57,8 @@ if mode != "block":
 open(sys.argv[2], "w").write("\n".join(out).rstrip("\n") + "\n")
 PY
 
-bash "$work/build.sh"
+# -euo pipefail, as sond-build-action runs the build: block: a failing line stops the build.
+bash -euo pipefail "$work/build.sh"
 echo "build: lines done"
 
 # A tiny consumer links and runs against lib/liblzma.a: the recipe lines survived musl.
