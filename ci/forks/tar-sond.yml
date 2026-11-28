@@ -3,7 +3,7 @@
 # --numeric-owner, --transform, --strip-components and -J/-z/--zstd, which exec xz, gzip and
 # zstd from PATH) from this fork's sond branch, static against the pinned musl, with xattr support (musl has the syscalls), and
 # publishes it, its corresponding source first, to dist.sond.dev. Only bin/tar ships: no rmt,
-# no backup scripts, no NLS. GPL-3.0-or-later needs the licence admitted (branch rsync-fork).
+# no backup scripts, no NLS. GPL-3.0-or-later is admitted in sondpkg.
 # Lives in the fork as .github/workflows/sond-package-tar.yml. Generated from
 # fredyk/sond-distro-pkg ci/forks.
 # Upstream: savannah's git timed out and no GitHub mirror carries release_1_35, so the pin is

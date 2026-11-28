@@ -3,7 +3,7 @@
 # GPL-3.0-or-later with its COPYING and its source lane, built hermetically from the release
 # tarball (configure already generated, no ./bootstrap, no gnulib clone). Every rule
 # ci/test-fork-workflows.sh applies to the other recipes applies here. GPL-3.0-or-later must be
-# an admitted licence in sondpkg (branch rsync-fork).
+# an admitted licence in sondpkg.
 # Offline: no network, no build.
 #
 # usage: ci/test-tar-fork.sh

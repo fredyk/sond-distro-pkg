@@ -8,7 +8,7 @@
 # Lives in the fork as .github/workflows/sond-package-nftables.yml. Generated from
 # fredyk/sond-distro-pkg ci/forks.
 # Fork creation, for the operator:
-#   secretd-github fork --name nftables-sond https://github.com/nftables/nftables   (or import git://git.netfilter.org/nftables)
+#   secretd-github fork --name nftables-sond https://git.netfilter.org/nftables
 #   secretd-github branch-create --name sond --sha 4af22fb3bef5f1672878fd7ee373947c36d33dbd fredyk/nftables-sond
 # then this file pushed to that branch under .github/workflows/.
 name: sond package nftables
