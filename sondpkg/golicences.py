@@ -88,17 +88,20 @@ def reviewed(package, module, version):
     return REVIEWED.get((package, module, version)) or REVIEWED.get((None, module, version))
 
 
-def parse_build_info(text, cgo=False):
+def parse_build_info(text, cgo=False, own=()):
     """``(go_version, [(module, version), ...])`` from ``go version -m`` output.
 
     ``cgo``: the caller accounts for the C side (the link maps name the archives linked), so a
     binary built with CGO_ENABLED=1 is read for its Go side only.
+    ``own``: modules of the repository being packaged, each replaced by its path in the checkout.
+    They are the package's own source, under the package's own licence, and are left out. Each
+    one must be such a local replacement: one fetched from the module cache is a dependency.
     """
     lines = text.splitlines()
     first = re.match(r"^\S.*: go(\d+\.\d+(?:\.\d+)?)\s*$", lines[0] if lines else "")
     if not first:
         raise PackagerError("not Go build info (expected the output of go version -m)")
-    deps, cgo_disabled = [], False
+    deps, cgo_disabled, own_replaced = [], False, set()
     for line in lines[1:]:
         fields = line.strip("\n").split("\t")
         if len(fields) < 3 or fields[0] != "":
@@ -107,12 +110,20 @@ def parse_build_info(text, cgo=False):
         if kind == "dep":
             deps.append((fields[2], fields[3]))
         elif kind == "=>":
-            if fields[2].startswith((".", "/")) or fields[3] == "(devel)":
+            local = fields[2].startswith((".", "/")) or fields[3] == "(devel)"
+            if local and deps and deps[-1][0] in own:
+                own_replaced.add(deps.pop()[0])
+                continue
+            if local:
                 raise PackagerError("local replacement %s: its licence cannot be read from the "
                                     "module cache" % fields[2])
             deps[-1] = (fields[2], fields[3])
         elif kind == "build" and fields[2] == "CGO_ENABLED=0":
             cgo_disabled = True
+    for module in own:
+        if module not in own_replaced and any(m == module for m, _ in deps):
+            raise PackagerError("%s is named as the package's own module but is not a local "
+                                "replacement: it comes from the module cache" % module)
     if not cgo_disabled and not cgo:
         raise PackagerError("the Go binary was not built with CGO_ENABLED=0: C code is linked "
                             "in and this path does not read its licences")
@@ -144,7 +155,7 @@ def _write(path, text):
         handle.write(text)
 
 
-def collect(package, build_info, modcache, goroot, out, admitted=None, cgo=False):
+def collect(package, build_info, modcache, goroot, out, admitted=None, cgo=False, own=()):
     """Return ``(bundled_lines, [(source_file, destination), ...])`` for pure Go binaries.
 
     ``build_info`` is one ``go version -m`` output file or a list of them, one per binary.
@@ -152,7 +163,7 @@ def collect(package, build_info, modcache, goroot, out, admitted=None, cgo=False
     infos = [build_info] if isinstance(build_info, str) else list(build_info)
     go_version, deps = None, []
     for info in infos:
-        version, binary_deps = parse_build_info(_read(info), cgo=cgo)
+        version, binary_deps = parse_build_info(_read(info), cgo=cgo, own=own)
         if go_version not in (None, version):
             raise PackagerError("the binaries were built by different Go toolchains (%s, %s)"
                                 % (go_version, version))
