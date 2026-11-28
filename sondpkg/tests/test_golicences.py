@@ -133,6 +133,33 @@ class BuildInfoTest(unittest.TestCase):
         with self.assertRaisesRegex(PackagerError, "local replacement"):
             golicences.parse_build_info(info)
 
+    def test_a_local_replacement_of_the_packages_own_module_is_the_package_itself(self):
+        # A module of the repository being packaged, replaced by its path in the checkout: it is
+        # the package's own source, under the package's own licence, not a dependency to read.
+        info = BUILD_INFO.replace(
+            "\tdep\tgolang.org/x/sys\tv0.49.0\th1:y=\n",
+            "\tdep\tgolang.org/x/sys\tv0.49.0\th1:y=\n"
+            "\tdep\texample.com/app\tv0.0.0-00010101000000-000000000000\t\n"
+            "\t=>\t../../\t(devel)\t\n",
+        )
+        _, deps = golicences.parse_build_info(info, own=("example.com/app",))
+        self.assertIn(("golang.org/x/sys", "v0.49.0"), deps)
+        self.assertNotIn("example.com/app", [m for m, _ in deps])
+        self.assertNotIn("../../", [m for m, _ in deps])
+
+    def test_a_local_replacement_of_another_module_is_still_refused(self):
+        info = BUILD_INFO.replace(
+            "\tdep\tgolang.org/x/sys\tv0.49.0\th1:y=\n",
+            "\tdep\tgolang.org/x/sys\tv0.49.0\t\n\t=>\t../sys\t(devel)\t\n",
+        )
+        with self.assertRaisesRegex(PackagerError, "local replacement"):
+            golicences.parse_build_info(info, own=("example.com/app",))
+
+    def test_an_own_module_must_be_a_local_replacement(self):
+        # Naming a module fetched from the cache as the package's own would hide its licence.
+        with self.assertRaisesRegex(PackagerError, "golang.org/x/sys.*not a local replacement"):
+            golicences.parse_build_info(BUILD_INFO, own=("golang.org/x/sys",))
+
     def test_not_a_go_binary_is_refused(self):
         with self.assertRaisesRegex(PackagerError, "go version -m"):
             golicences.parse_build_info("/bin/sh: could not read Go build info\n")
@@ -379,6 +406,29 @@ class CliTest(unittest.TestCase):
             self.assertIn("CGO_ENABLED=0", err)
             rc, _, err = run_cli(args + ["--cgo"])
             self.assertEqual(rc, 0, err)
+
+
+    def test_go_licences_leaves_out_an_own_module_replaced_locally(self):
+        with tempfile.TemporaryDirectory() as root:
+            info = os.path.join(root, "info")
+            write_bytes(info, ("/x: go1.26.9\n\tdep\tgolang.org/x/sys\tv0.49.0\th1:a=\n"
+                               "\tdep\texample.com/app\tv0.0.0\t\n\t=>\t../../\t(devel)\t\n"
+                               "\tbuild\tCGO_ENABLED=0\n").encode())
+            write_bytes(os.path.join(root, "mod", "golang.org/x/sys@v0.49.0", "LICENSE"),
+                        BSD3.encode())
+            write_bytes(os.path.join(root, "goroot", "LICENSE"), BSD3.encode())
+            out = os.path.join(root, "out")
+            args = ["go-licences", "--name", "app", "--build-info", info,
+                    "--modcache", os.path.join(root, "mod"),
+                    "--goroot", os.path.join(root, "goroot"), "--out", out]
+            rc, _, err = run_cli(args)
+            self.assertEqual(rc, 1)
+            self.assertIn("local replacement", err)
+            rc, _, err = run_cli(args + ["--own-module", "example.com/app"])
+            self.assertEqual(rc, 0, err)
+            with open(os.path.join(out, "bundled.txt"), encoding="utf-8") as handle:
+                self.assertEqual(handle.read(),
+                                 "go 1.26.9 BSD-3-Clause\ngolang.org/x/sys v0.49.0 BSD-3-Clause\n")
 
 
 if __name__ == "__main__":
