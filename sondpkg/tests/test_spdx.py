@@ -64,9 +64,10 @@ class SpdxTest(unittest.TestCase):
         expression = "GPL-3.0-or-later AND LGPL-2.1-or-later AND Zlib AND MIT"
         spdx.check_license(expression)
         spdx.check_bundled("Zlib")
+
     def test_unsquashfs_with_zlib_and_liblzma_linked_in_is_admitted(self):
-        # squashfs-tools builds zlib (Zlib) and liblzma (0BSD) in its own job and links both
-        # statically into unsquashfs, so their licences are part of the package's expression.
+        # unsquashfs links the published zlib (Zlib) and liblzma (0BSD) packages statically, so
+        # their licences are part of the package's expression.
         spdx.check_license("GPL-2.0-or-later AND Zlib AND 0BSD")
         self.assertTrue(spdx.is_copyleft("GPL-2.0-or-later AND Zlib AND 0BSD"))
 
