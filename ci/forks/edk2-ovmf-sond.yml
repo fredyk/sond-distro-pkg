@@ -1,0 +1,66 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the edk2-ovmf package (OVMF, the x86_64 UEFI firmware incus boots its q35 VMs with)
+# from this fork's sond branch, tag edk2-stable202608, and publishes it to dist.sond.dev.
+# Firmware images, not host executables: nothing links musl. The files land in share/OVMF under
+# the Debian/Ubuntu names incus 7.6 searches first in /usr/share/OVMF
+# (internal/server/instance/drivers/edk2/driver_edk2.go), so a VM copied from Roubaix (Ubuntu,
+# package ovmf) finds the Vars file its NVRAM was created from. On the box, INCUS_EDK2_PATH
+# points at <prefix>/share/OVMF when the prefix is not /usr.
+# Lives in the fork as .github/workflows/sond-package-edk2-ovmf.yml. Generated from
+# fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator:
+#   secretd-github fork --name edk2-sond https://github.com/tianocore/edk2
+#   secretd-github branch-create --name sond --sha 2970e5699ba6267f3384ffab20f96647578aebc8 fredyk/edk2-sond
+# then this file pushed to that branch under .github/workflows/.
+name: sond package edk2-ovmf
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - run: sudo apt-get install -y -qq --no-install-recommends nasm iasl uuid-dev python3
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: edk2-ovmf
+          version: 2026.08
+          license: BSD-2-Clause-Patent
+          upstream: github.com/tianocore/edk2@2970e5699ba6267f3384ffab20f96647578aebc8
+          linkage: firmware images built with the host GCC5 toolchain, no libc linked
+          license-files: |
+            License.txt=share/licenses/edk2-ovmf/COPYING
+          build: |
+            # edk2's documented build (OvmfPkg/README): BaseTools first, then OvmfPkgX64.dsc with
+            # the GCC5 tag. 4 MiB flash (FD_SIZE_4MB): the layout Ubuntu ships as *_4M.fd.
+            # Generic: no secure boot. Secure boot: SMM_REQUIRE on, as q35 needs for an
+            # authenticated variable store. The host compiler builds firmware, not Linux code,
+            # so SOND_CC is not used.
+            make -C BaseTools -j"$(nproc)"
+            . ./edksetup.sh
+            common="-a X64 -t GCC5 -b RELEASE -p OvmfPkg/OvmfPkgX64.dsc -D FD_SIZE_4MB -D NETWORK_HTTP_BOOT_ENABLE -D NETWORK_TLS_ENABLE=FALSE"
+            build $common -D SECURE_BOOT_ENABLE=FALSE -D SMM_REQUIRE=FALSE
+            mkdir -p "$SOND_PAYLOAD/share/OVMF"
+            fv=Build/OvmfX64/RELEASE_GCC5/FV
+            install -m 0644 $fv/OVMF_CODE.fd "$SOND_PAYLOAD/share/OVMF/OVMF_CODE_4M.fd"
+            install -m 0644 $fv/OVMF_VARS.fd "$SOND_PAYLOAD/share/OVMF/OVMF_VARS_4M.fd"
+            rm -rf Build
+            build $common -D SECURE_BOOT_ENABLE=TRUE -D SMM_REQUIRE=TRUE
+            install -m 0644 $fv/OVMF_CODE.fd "$SOND_PAYLOAD/share/OVMF/OVMF_CODE_4M.secboot.fd"
+            install -m 0644 $fv/OVMF_VARS.fd "$SOND_PAYLOAD/share/OVMF/OVMF_VARS_4M.secboot.fd"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
