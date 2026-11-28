@@ -1,0 +1,56 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the squashfs-tools package (the unsquashfs command) from this fork's sond branch,
+# static against the pinned musl, and publishes it, its corresponding source first, to
+# dist.sond.dev. Only bin/unsquashfs ships, reading gzip and xz
+# images: liblzma 5.8.4 (0BSD) and zlib 1.3.2 (Zlib) are the published packages under depends,
+# linked in from the sysroot; lzo, lz4 and zstd are left out.
+# Lives in the fork as .github/workflows/sond-package-squashfs-tools.yml. Generated from
+# fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator:
+#   secretd-github fork --name squashfs-tools-sond https://github.com/plougher/squashfs-tools
+#   secretd-github branch-create --name sond --sha 708c59ae80853b0845017c33b42e56061cc546cd fredyk/squashfs-tools-sond
+# then this file pushed to that branch under .github/workflows/.
+name: sond package squashfs-tools
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: squashfs-tools
+          version: 4.7.5
+          license: GPL-2.0-or-later AND Zlib AND 0BSD
+          upstream: github.com/plougher/squashfs-tools@708c59ae80853b0845017c33b42e56061cc546cd
+          license-files: |
+            COPYING
+          depends: |
+            liblzma 5.8.4
+            zlib 1.3.2
+          build: |
+            # unsquashfs alone, gzip and xz only. liblzma (0BSD) and zlib (Zlib) are the depends:
+            # packages; their headers and archives are in the sysroot SOND_CFLAGS and SOND_LDFLAGS
+            # point at. CFLAGS and LDFLAGS through the environment: on the command line they would
+            # override the Makefile's own "CFLAGS +=" (-I., -D_GNU_SOURCE, the -D..._SUPPORT
+            # switches); the *_SUPPORT selections on the command line override the Makefile's
+            # defaults.
+            CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" make -C squashfs-tools unsquashfs GZIP_SUPPORT=1 XZ_SUPPORT=1 LZO_SUPPORT=0 LZ4_SUPPORT=0 ZSTD_SUPPORT=0 COMP_DEFAULT=gzip -j "$(nproc)"
+            install -D -m 0755 squashfs-tools/unsquashfs "$SOND_PAYLOAD/bin/unsquashfs"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}

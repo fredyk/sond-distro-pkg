@@ -69,6 +69,12 @@ class SpdxTest(unittest.TestCase):
         spdx.check_license("BSD-2-Clause-Patent")
         self.assertFalse(spdx.is_copyleft("BSD-2-Clause-Patent"))
 
+    def test_unsquashfs_with_zlib_and_liblzma_linked_in_is_admitted(self):
+        # unsquashfs links the published zlib (Zlib) and liblzma (0BSD) packages statically, so
+        # their licences are part of the package's expression.
+        spdx.check_license("GPL-2.0-or-later AND Zlib AND 0BSD")
+        self.assertTrue(spdx.is_copyleft("GPL-2.0-or-later AND Zlib AND 0BSD"))
+
     def test_the_c_libraries_incusd_links_are_admitted_as_packages(self):
         # the licence opinion's incusd table: each library is published as a package of its own,
         # under the licence it carries when linked
