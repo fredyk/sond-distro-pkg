@@ -77,6 +77,12 @@ if [ -f "$yml" ]; then
 		|| bad "removes the gobject headers"
 	has 'rm -f "\$SOND_PAYLOAD/include/glib-2\.0/glib-object\.h"' && ok "removes glib-object.h" \
 		|| bad "removes glib-object.h"
+	# girepository (libgirepository-2.0, built at 2.86 whatever -Dintrospection says) links
+	# gobject and libffi, and meson leaves an empty lib/gio/modules for gio's modules.
+	has 'rm -f "\$SOND_PAYLOAD/lib/libgirepository-2\.0\.a" "\$SOND_PAYLOAD/lib/pkgconfig/girepository-2\.0\.pc"' \
+		&& ok "removes the girepository archive and .pc" || bad "removes the girepository archive and .pc"
+	has 'rm -rf "\$SOND_PAYLOAD/include/glib-2\.0/girepository" "\$SOND_PAYLOAD/lib/gio"' \
+		&& ok "removes the girepository headers and lib/gio" || bad "removes the girepository headers and lib/gio"
 	# payload: lib/*.a, include, lib/pkgconfig and nothing else (no bin/, share/ beyond licences).
 	has 'rm -rf "\$SOND_PAYLOAD/bin" "\$SOND_PAYLOAD/share"' && ok "ships no programs or data" \
 		|| bad "ships no programs or data (bin/ and share/ removed)"
