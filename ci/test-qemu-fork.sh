@@ -1,9 +1,7 @@
 #!/bin/bash
-# Shape checks for the qemu and edk2-ovmf fork recipes: what incus 7.6 needs to start a q35 UEFI
-# VM. qemu-system-x86_64 and qemu-img, static against musl, x86_64 KVM only, without spice
-# (incus 7.6 probes query-spice and leaves the spice sections out when qemu lacks it) and the
-# source lane; OVMF under the names
-# internal/server/instance/drivers/edk2/driver_edk2.go searches in /usr/share/OVMF.
+# Shape checks for the qemu and edk2-ovmf fork recipes: what a q35 UEFI KVM guest needs.
+# qemu-system-x86_64 and qemu-img, static against musl, x86_64 KVM only, without spice, and the
+# source lane; OVMF under the file names of Debian and Ubuntu's ovmf package.
 # Offline: no network, no build.
 #
 # usage: ci/test-qemu-fork.sh
@@ -58,8 +56,8 @@ if [ -f "$q" ]; then
 	has "$q" 'install -D -m 0755 build/qemu-system-x86_64 "\$SOND_PAYLOAD/bin/qemu-system-x86_64"' "qemu: ships bin/qemu-system-x86_64"
 	has "$q" 'install -D -m 0755 build/qemu-img "\$SOND_PAYLOAD/bin/qemu-img"' "qemu: ships bin/qemu-img"
 	has "$q" 'bios-256k.bin' "qemu: ships bios-256k.bin (security.csm VMs)"
-	# incus 7.6 looks for the CSM firmware as /usr/share/seabios/bios-256k.bin.
-	has "$q" '"\$SOND_PAYLOAD/share/seabios/bios-256k.bin"' "qemu: ships share/seabios/bios-256k.bin where incus searches for CSM"
+	# Debian's seabios package puts the CSM firmware at share/seabios/bios-256k.bin.
+	has "$q" '"\$SOND_PAYLOAD/share/seabios/bios-256k.bin"' "qemu: ships share/seabios/bios-256k.bin, Debian's CSM firmware path"
 	has "$q" 'efi-virtio.rom' "qemu: ships the virtio option ROM"
 	has "$q" 'keymaps/en-us' "qemu: ships the en-us keymap"
 	has "$q" 'COPYING.LIB=share/licenses/qemu/LGPL-2.1' "qemu: ships the LGPL-2.1 text"
@@ -77,11 +75,9 @@ if [ -f "$e" ]; then
 	has "$e" 'OvmfPkg/OvmfPkgX64.dsc' "edk2-ovmf: builds OvmfPkgX64"
 	has "$e" 'FD_SIZE_4MB' "edk2-ovmf: 4 MiB flash layout"
 	has "$e" 'submodules: recursive' "edk2-ovmf: checks out edk2's submodules (openssl, Brotli, ...)"
-	# The pairs incus 7.6 tries in /usr/share/OVMF, GENERIC and SECUREBOOT (driver_edk2.go).
-	# OVMF_CODE_4M.ms.fd/OVMF_VARS_4M.ms.fd: the SECUREBOOT pair incus picked on Roubaix (Ubuntu
-	# package ovmf has no OVMF_VARS.4MB.ms.fd, so the second entry wins) for every VM created with
-	# the default security.secureboot=true. A replica's qemu.nvram links to OVMF_VARS_4M.ms.fd, and
-	# incus starts it only with the pair whose Vars has that name.
+	# Debian and Ubuntu's ovmf file names, plain and secure boot. OVMF_CODE_4M.ms.fd and
+	# OVMF_VARS_4M.ms.fd: Ubuntu's secure boot pair with the Microsoft keys enrolled; an NVRAM
+	# created from it refers to OVMF_VARS_4M.ms.fd by name.
 	for f in OVMF_CODE_4M.fd OVMF_VARS_4M.fd OVMF_CODE_4M.secboot.fd OVMF_VARS_4M.secboot.fd OVMF_CODE_4M.ms.fd OVMF_VARS_4M.ms.fd; do
 		has "$e" "\\\$SOND_PAYLOAD/share/OVMF/$f\"" "edk2-ovmf: ships share/OVMF/$f"
 	done

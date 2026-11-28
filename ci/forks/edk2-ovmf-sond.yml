@@ -1,11 +1,9 @@
 # Modified by the Sond project, 2026-11-26
-# Builds the edk2-ovmf package (OVMF, the x86_64 UEFI firmware incus boots its q35 VMs with)
+# Builds the edk2-ovmf package (OVMF, the x86_64 UEFI firmware for q35 virtual machines)
 # from this fork's sond branch, tag edk2-stable202608, and publishes it to dist.sond.dev.
 # Firmware images, not host executables: nothing links musl. The files land in share/OVMF under
-# the Debian/Ubuntu names incus 7.6 searches first in /usr/share/OVMF
-# (internal/server/instance/drivers/edk2/driver_edk2.go), so a VM copied from Roubaix (Ubuntu,
-# package ovmf) finds the Vars file its NVRAM was created from. On the box, INCUS_EDK2_PATH
-# points at <prefix>/share/OVMF when the prefix is not /usr.
+# the file names Debian and Ubuntu's ovmf package uses, so a VM whose NVRAM was created from that
+# package finds the same Vars file here.
 # Lives in the fork as .github/workflows/sond-package-edk2-ovmf.yml. Generated from
 # fredyk/sond-distro-pkg ci/forks.
 # Fork creation, for the operator:
@@ -61,12 +59,11 @@ jobs:
             build $common -D SECURE_BOOT_ENABLE=TRUE -D SMM_REQUIRE=TRUE
             install -m 0644 $fv/OVMF_CODE.fd "$SOND_PAYLOAD/share/OVMF/OVMF_CODE_4M.secboot.fd"
             install -m 0644 $fv/OVMF_VARS.fd "$SOND_PAYLOAD/share/OVMF/OVMF_VARS_4M.secboot.fd"
-            # The .ms pair, Ubuntu's names: incus's SECUREBOOT list tries OVMF_VARS_4M.ms.fd before
-            # .secboot, so on Roubaix (package ovmf) every VM left at security.secureboot=true got
-            # a qemu.nvram linking to OVMF_VARS_4M.ms.fd, and a replica starts only with that name.
+            # The .ms pair, Ubuntu's names: an NVRAM created from Ubuntu's ovmf package with
+            # secure boot on refers to OVMF_VARS_4M.ms.fd, so the pair ships under that name too.
             # Code: the secure boot SMM build, as Ubuntu's OVMF_CODE_4M.ms.fd. Vars: the same empty
             # store with the Microsoft UEFI CA and KEK enrolled and secure boot on, so a fresh VM
-            # boots shim-signed Ubuntu and Debian images like on Roubaix.
+            # boots shim-signed Ubuntu and Debian images.
             install -m 0644 $fv/OVMF_CODE.fd "$SOND_PAYLOAD/share/OVMF/OVMF_CODE_4M.ms.fd"
             ~/.local/bin/virt-fw-vars --input $fv/OVMF_VARS.fd --output "$SOND_PAYLOAD/share/OVMF/OVMF_VARS_4M.ms.fd" --enroll-redhat --secure-boot
       - uses: fredyk/sond-publish-action@v1

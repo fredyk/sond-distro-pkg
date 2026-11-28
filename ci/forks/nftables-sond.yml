@@ -1,10 +1,8 @@
 # Modified by the Sond project, 2026-11-26
 # Builds the nftables package (the nft command) from this fork's sond branch, static against the
 # pinned musl, with libmnl 1.0.5 and libnftnl 1.3.2 built in-job from hash-checked tarballs, and
-# publishes it, its corresponding source first, to dist.sond.dev. dockerd 29.10.1 (a static build)
-# drives its nftables firewall backend by exec'ing nft from PATH (moby docker-v29.10.1
-# daemon/libnetwork/internal/nftables/nft_exec_linux.go:1,23-30), and incus's bridge needs nft
-# too. Only bin/nft ships: no libnftables.so, no headers, no examples.
+# publishes it, its corresponding source first, to dist.sond.dev. Only bin/nft ships: no
+# libnftables.so, no headers, no examples.
 # Lives in the fork as .github/workflows/sond-package-nftables.yml. Generated from
 # fredyk/sond-distro-pkg ci/forks.
 # Fork creation, for the operator:

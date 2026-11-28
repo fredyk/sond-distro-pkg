@@ -77,7 +77,7 @@ if [ -f "$yml" ]; then
 		grep -qF -- "--disable-$o" "$yml" && ok "$o is disabled" \
 			|| bad "$o is disabled"
 	done
-	# incus: LocalCopy runs "rsync -a -HA" and its features add --xattrs (internal/rsync/rsync.go)
+	# rsync -A and -X need ACL and xattr support compiled in.
 	grep -qF -- '--enable-acl-support' "$yml" && grep -qF "SUPPORT_ACLS 1' config.h" "$yml" \
 		&& ok "ACL support is on and asserted" || bad "ACL support is on and asserted"
 	grep -qF -- '--enable-xattr-support' "$yml" && grep -qF "SUPPORT_XATTRS 1' config.h" "$yml" \
