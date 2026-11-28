@@ -74,6 +74,10 @@ if [ -f "$yml" ]; then
 	grep -qE -- '--prefix=/ ' "$yml" && ok "prefix / (lib/, include/ at the payload root)" || bad "prefix /"
 	grep -qE 'install-toolexeclibLTLIBRARIES' "$yml" && ok "ships lib/libffi.a" || bad "ships lib/libffi.a"
 	grep -qE 'install-pkgconfigDATA' "$yml" && ok "ships lib/pkgconfig/libffi.pc" || bad "ships lib/pkgconfig/libffi.pc"
+	# AX_ENABLE_BUILDDIR: configured in the checkout, libffi builds in a <host> subdirectory and
+	# leaves include/ without a Makefile, so `make -C include` finds no rule. Built in place.
+	grep -qE -- '--disable-builddir' "$yml" && ok "builds in the checkout, include/Makefile where make -C include looks" \
+		|| bad "builds in the checkout (--disable-builddir), include/Makefile where make -C include looks"
 	grep -qE 'make -C include .*install-nodist_includeHEADERS' "$yml" && ok "ships include/ffi.h and include/ffitarget.h" \
 		|| bad "ships include/ffi.h and include/ffitarget.h"
 	grep -qE 'rm -f "\$SOND_PAYLOAD"/lib/\*\.la' "$yml" && ok "no libtool archive" || bad "no libtool archive (rm lib/*.la)"
