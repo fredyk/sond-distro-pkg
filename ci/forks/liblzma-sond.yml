@@ -1,0 +1,49 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the liblzma package (lib/liblzma.a, include/lzma.h and include/lzma/,
+# lib/pkgconfig/liblzma.pc) from the xz-sond fork's sond branch, the same pin as the xz package,
+# static against the pinned musl, and publishes it to dist.sond.dev. A package that links
+# liblzma lists it under depends:, so liblzma's source is bundled with that package's source.
+# liblzma is 0BSD. No command is built (the xz command is the xz package). Lives in the xz-sond
+# fork as .github/workflows/sond-package-liblzma.yml, next to sond-package-xz.yml; the fork's
+# SOND_PUBLISH_TOKEN scope must name liblzma too. Generated from fredyk/sond-distro-pkg ci/forks.
+name: sond package liblzma
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: liblzma
+          version: 5.8.4
+          license: 0BSD
+          upstream: github.com/tukaani-project/xz@d3e650e63c110e830fd5391e7f8b45df0b91d3da
+          license-files: |
+            COPYING
+            COPYING.0BSD
+          build: |
+            CC="$SOND_CC" cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_FLAGS="$SOND_CFLAGS" -DCMAKE_INSTALL_LIBDIR=lib \
+              -DBUILD_SHARED_LIBS=OFF -DXZ_NLS=OFF -DXZ_DOC=OFF -DXZ_TOOL_SCRIPTS=OFF \
+              -DXZ_TOOL_XZ=OFF -DXZ_TOOL_XZDEC=OFF -DXZ_TOOL_LZMADEC=OFF -DXZ_TOOL_LZMAINFO=OFF \
+              -DXZ_TOOL_SYMLINKS=OFF -DXZ_TOOL_SYMLINKS_LZMA=OFF
+            cmake --build build --target liblzma -j "$(nproc)"
+            cmake --install build --prefix "$SOND_PAYLOAD"
+            rm -rf "$SOND_PAYLOAD/lib/cmake" "$SOND_PAYLOAD/share/doc" "$SOND_PAYLOAD/share/man"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
