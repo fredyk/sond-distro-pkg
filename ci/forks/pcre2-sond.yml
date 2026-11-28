@@ -1,0 +1,62 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the pcre2 package (static libpcre2-8 with pcre2.h and libpcre2-8.pc, no program) from
+# this fork's sond branch against the pinned musl and publishes it to dist.sond.dev, its
+# corresponding source first. It is a build input for glib, which needs libpcre2-8 only.
+# Generated from fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator (no push credential on this VM):
+#   secretd-github fork --name pcre2-sond https://github.com/PCRE2Project/pcre2
+#   secretd-github branch-create --name sond --sha 6f9d7c1373262c541324a16a358785b33ef116cf fredyk/pcre2-sond
+# then this file pushed to that branch under .github/workflows/.
+name: sond package pcre2
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: sudo apt-get install -y -qq --no-install-recommends cmake
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: pcre2
+          version: 10.49
+          license: BSD-3-Clause WITH PCRE2-exception
+          upstream: github.com/PCRE2Project/pcre2@6f9d7c1373262c541324a16a358785b33ef116cf
+          license-files: |
+            LICENCE.md=share/licenses/pcre2/LICENCE.md
+          build: |
+            # LICENCE.md (BSD-3-Clause plus the PCRE2 binary-distribution exception), checked
+            # byte for byte before anything ships.
+            printf '197d8a73ffee0d6b09adba2f9c677b5f5aede24edf89258a68e48248d010d811  LICENCE.md\n' | sha256sum -c -
+            # Option names from CMakeLists.txt at the pinned commit. 8-bit only (glib links
+            # libpcre2-8). JIT off: it would compile in the bundled sljit (machine code generated
+            # into executable memory at run time, W^X-hostile), glib uses it only as an optional
+            # speed-up and falls back to the interpreter, and it is a second code base to audit.
+            # No pcre2grep, pcre2test or tests: library package.
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/ \
+              -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_C_COMPILER="$SOND_CC" \
+              -DCMAKE_C_FLAGS="$SOND_CFLAGS" -DCMAKE_EXE_LINKER_FLAGS="$SOND_LDFLAGS -static" \
+              -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON \
+              -DPCRE2_BUILD_PCRE2_8=ON -DPCRE2_BUILD_PCRE2_16=OFF -DPCRE2_BUILD_PCRE2_32=OFF \
+              -DPCRE2_SUPPORT_JIT=OFF -DPCRE2_SUPPORT_UNICODE=ON \
+              -DPCRE2_BUILD_PCRE2GREP=OFF -DPCRE2_BUILD_TESTS=OFF
+            cmake --build build -j"$(nproc)"
+            install -D -m 0644 build/libpcre2-8.a "$SOND_PAYLOAD/lib/libpcre2-8.a"
+            install -D -m 0644 build/interface/pcre2.h "$SOND_PAYLOAD/include/pcre2.h"
+            install -D -m 0644 build/libpcre2-8.pc "$SOND_PAYLOAD/lib/pkgconfig/libpcre2-8.pc"
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
