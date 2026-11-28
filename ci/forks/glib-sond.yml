@@ -36,15 +36,16 @@ jobs:
           license: LGPL-2.1-or-later
           upstream: github.com/GNOME/glib@3033f7862c2d3c7569cef2ad4b425cf42e95d4b4
           license-files: |
-            COPYING=share/licenses/glib/LGPL-2.1
+            LICENSES/LGPL-2.1-or-later.txt=share/licenses/glib/LGPL-2.1
           depends: |
             pcre2 10.49
             libffi 3.5.2
             zlib 1.3.2
             linux-headers 6.12.77
           build: |
-            # COPYING is the LGPL-2.1 text, checked byte for byte before anything ships.
-            printf '65986a89240f59896ce42a3779bbe5ed486a0bca7df636a8eef030fd2e1a0984  COPYING\n' | sha256sum -c -
+            # The LGPL-2.1 text, checked byte for byte before anything ships. COPYING is a symlink
+            # to it, so the text is read at its own path.
+            printf 'fa6f36630bb1e0c571d34b2bbdf188d08495c9dbf58f28cac112f303fc1f58fb  LICENSES/LGPL-2.1-or-later.txt\n' | sha256sum -c -
             # Option names from meson.options at the pinned commit. Everything that would pull a
             # host library (selinux, libmount, libelf, sysprof), a tool (introspection, docs, man
             # pages, dtrace/systemtap) or gettext is off; xattr goes through the C library anyway.
