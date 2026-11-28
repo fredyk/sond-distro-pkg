@@ -17,8 +17,10 @@ bad() { printf 'FAIL %s\n' "$1"; fails=$((fails + 1)); }
 # Measured on 2026-11-26 from github.com/GNOME/glib at its tag 2.86.5 (peeled commit).
 VERSION=2.86.5
 UPSTREAM=github.com/GNOME/glib@3033f7862c2d3c7569cef2ad4b425cf42e95d4b4
-# sha256 of COPYING at that commit (LGPL-2.1 text).
-COPYING_SHA=65986a89240f59896ce42a3779bbe5ed486a0bca7df636a8eef030fd2e1a0984
+# COPYING at that commit is a symlink to LICENSES/LGPL-2.1-or-later.txt: a checkout reads the
+# text through it, so the text is pinned, and shipped, at its own path. sha256 of that file:
+LICENCE_TEXT=LICENSES/LGPL-2.1-or-later.txt
+LICENCE_TEXT_SHA=fa6f36630bb1e0c571d34b2bbdf188d08495c9dbf58f28cac112f303fc1f58fb
 
 base_log=$(mktemp)
 exit() {
@@ -37,7 +39,10 @@ yml=$here/forks/glib-sond.yml
 has() { grep -qE -- "$1" "$yml"; }
 if [ -f "$yml" ]; then
 	has '^ +license: LGPL-2\.1-or-later$' && ok "license LGPL-2.1-or-later" || bad "license LGPL-2.1-or-later"
-	has "$COPYING_SHA" && ok "COPYING pinned by sha256" || bad "COPYING pinned by sha256"
+	has "$LICENCE_TEXT_SHA  $LICENCE_TEXT" && ok "LGPL-2.1 text pinned by sha256 at its own path" \
+		|| bad "LGPL-2.1 text pinned by sha256 at $LICENCE_TEXT"
+	has "^ +$LICENCE_TEXT=share/licenses/glib/LGPL-2\.1$" && ok "ships the LGPL-2.1 text from its own path" \
+		|| bad "ships $LICENCE_TEXT as share/licenses/glib/LGPL-2.1"
 	has 'meson setup' && ok "built with meson" || bad "built with meson"
 	has -- '--default-library=static' && ok "static library only" || bad "--default-library=static"
 	for opt in '-Dintrospection=disabled' '-Dtests=false' '-Ddocumentation=false' \
