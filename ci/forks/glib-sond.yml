@@ -1,0 +1,93 @@
+# Modified by the Sond project, 2026-11-26
+# Builds the glib package (static libglib-2.0, libgthread-2.0, libgmodule-2.0 with headers and
+# pkg-config files, no program) from this fork's sond branch against the pinned musl and
+# publishes it to dist.sond.dev, its corresponding source first. It is a build input for a
+# static qemu (glib-2.0 >= 2.66, gthread-2.0, gmodule-no-export-2.0). pcre2 and libffi are
+# separate packages reached through `depends`; no meson wrap is downloaded at build time.
+# Generated from fredyk/sond-distro-pkg ci/forks.
+# Fork creation, for the operator (no push credential on this VM):
+#   secretd-github fork --name glib-sond https://github.com/GNOME/glib
+#   secretd-github branch-create --name sond --sha 3033f7862c2d3c7569cef2ad4b425cf42e95d4b4 fredyk/glib-sond
+# then this file pushed to that branch under .github/workflows/, and every file the fork adds
+# carries the Sond change notice (licence opinion, section 3).
+name: sond package glib
+
+on:
+  push:
+    branches: [sond]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: sudo apt-get install -y -qq --no-install-recommends meson ninja-build python3-packaging
+      - id: build
+        uses: fredyk/sond-build-action@v1
+        with:
+          name: glib
+          version: 2.86.5
+          license: LGPL-2.1-or-later
+          upstream: github.com/GNOME/glib@3033f7862c2d3c7569cef2ad4b425cf42e95d4b4
+          license-files: |
+            LICENSES/LGPL-2.1-or-later.txt=share/licenses/glib/LGPL-2.1
+          depends: |
+            pcre2 10.49
+            libffi 3.5.2
+            zlib 1.3.2
+            linux-headers 6.12.77
+          build: |
+            # The LGPL-2.1 text, checked byte for byte before anything ships. COPYING is a symlink
+            # to it, so the text is read at its own path.
+            printf 'fa6f36630bb1e0c571d34b2bbdf188d08495c9dbf58f28cac112f303fc1f58fb  LICENSES/LGPL-2.1-or-later.txt\n' | sha256sum -c -
+            # Option names from meson.options at the pinned commit. Everything that would pull a
+            # host library (selinux, libmount, libelf, sysprof), a tool (introspection, docs, man
+            # pages, dtrace/systemtap) or gettext is off; xattr goes through the C library anyway.
+            # zlib is a depends: entry, not a runner leftover: gio's gzlibcompressor.c includes
+            # <zlib.h>, and SOND_CFLAGS (-isystem $SOND_SYSROOT/include) must be the only place
+            # that header resolves from.
+            CC="$SOND_CC" CFLAGS="$SOND_CFLAGS" LDFLAGS="$SOND_LDFLAGS -static" \
+              meson setup build --prefix=/ --libdir=lib --buildtype=release \
+                --default-library=static --wrap-mode=nodownload \
+                -Dintrospection=disabled -Dtests=false -Ddocumentation=false \
+                -Dman-pages=disabled -Dnls=disabled -Dselinux=disabled -Dxattr=false \
+                -Dlibmount=disabled -Dsysprof=disabled -Dlibelf=disabled -Ddtrace=disabled \
+                -Dsystemtap=disabled
+            ninja -C build
+            DESTDIR="$SOND_PAYLOAD" meson install -C build --no-rebuild
+            # Library package: lib/*.a, include/ and lib/pkgconfig/ (plus glibconfig.h, which glib
+            # installs under lib/glib-2.0/include and glib-2.0.pc points at). No gdbus, gio tools,
+            # gdb scripts, gettext data or codegen helpers.
+            rm -rf "$SOND_PAYLOAD/bin" "$SOND_PAYLOAD/share" "$SOND_PAYLOAD/libexec"
+            # gio and gobject are not part of this package: their meson install would put their
+            # archives, .pc files and headers inside the payload, and a consumer's static meson
+            # then finds gio (qemu's gio probe is an auto feature) and drags libffi in through it.
+            # Removed by file name, the layout meson install produced at 2.86.5.
+            rm -f "$SOND_PAYLOAD/lib/libgio-2.0.a" "$SOND_PAYLOAD/lib/libgobject-2.0.a"
+            rm -f "$SOND_PAYLOAD/lib/pkgconfig/gio-2.0.pc" "$SOND_PAYLOAD/lib/pkgconfig/gio-unix-2.0.pc" \
+              "$SOND_PAYLOAD/lib/pkgconfig/gobject-2.0.pc"
+            rm -f "$SOND_PAYLOAD/lib/pkgconfig/gmodule-2.0.pc" "$SOND_PAYLOAD/lib/pkgconfig/gmodule-export-2.0.pc"
+            rm -rf "$SOND_PAYLOAD/include/gio-unix-2.0" "$SOND_PAYLOAD/include/glib-2.0/gio" \
+              "$SOND_PAYLOAD/include/glib-2.0/gobject"
+            rm -f "$SOND_PAYLOAD/include/glib-2.0/glib-object.h"
+            # girepository is built at 2.86.5 whatever -Dintrospection says, and links gobject and
+            # libffi; lib/gio/modules is gio's empty module directory.
+            rm -f "$SOND_PAYLOAD/lib/libgirepository-2.0.a" "$SOND_PAYLOAD/lib/pkgconfig/girepository-2.0.pc"
+            rm -rf "$SOND_PAYLOAD/include/glib-2.0/girepository" "$SOND_PAYLOAD/lib/gio"
+            for f in lib/pkgconfig/glib-2.0.pc lib/pkgconfig/gthread-2.0.pc \
+              lib/pkgconfig/gmodule-no-export-2.0.pc lib/glib-2.0/include/glibconfig.h \
+              lib/libglib-2.0.a lib/libgthread-2.0.a lib/libgmodule-2.0.a; do
+              test -f "$SOND_PAYLOAD/$f"
+            done
+      - uses: fredyk/sond-publish-action@v1
+        with:
+          bundle: ${{ steps.build.outputs.bundle }}
+          source-bundle: ${{ steps.build.outputs.source_bundle }}
+          token: ${{ secrets.SOND_PUBLISH_TOKEN }}
+          signing-key: ${{ secrets.SOND_SIGNING_KEY }}
