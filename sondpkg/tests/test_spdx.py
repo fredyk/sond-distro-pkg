@@ -73,6 +73,11 @@ class SpdxTest(unittest.TestCase):
                            "LGPL-2.1-only", "LGPL-2.1-or-later", "BSD-3-Clause OR GPL-2.0-only"):
             spdx.check_license(expression)
 
+    def test_zlib_is_admitted_as_a_package_and_is_not_copyleft(self):
+        # zlib ships as a static library for qemu; its licence is the permissive Zlib one.
+        spdx.check_license("Zlib")
+        self.assertFalse(spdx.is_copyleft("Zlib"))
+
     def test_bundled_licence_atoms_and_exceptions(self):
         spdx.check_bundled("LGPL-3.0-only WITH LGPL-3.0-linking-exception")
         spdx.check_bundled("BSD-3-Clause OR GPL-2.0-only")

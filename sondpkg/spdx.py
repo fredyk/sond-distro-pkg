@@ -25,7 +25,7 @@ LICENSE_ATOMS = frozenset({
     "MPL-2.0",
     # rsync: incusd needs it on PATH and receives dir volumes with it
     "GPL-3.0-or-later",
-    # rsync builds the zlib bundled in its tree (--with-included-zlib)
+    # rsync builds the zlib bundled in its tree (--with-included-zlib), and the zlib package itself
     "Zlib",
 })
 # Identifiers a component linked into the package may use.
